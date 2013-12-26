@@ -1,0 +1,91 @@
+maybeStart: !started, 
+	channelReady: for both, true as soon as channel to server open 
+	turnDone: for both, true as soon as turn server found
+	localStream: for both, true as soon as getUserMediaSuccess 
+	signalingReady: for Initiator, always true
+					for visitor, becomes true after receiving the offer
+
+
+Overview.
+The first agent to join will not be the initiator.  That agent will generally
+have time to open a signalling channel, request turn servers, and get user
+media.
+
+When the second agent joins, she is the initiator.  That agent will open a
+signalling channel, request turn servers, and get user media.
+
+Once the initiator has finished these setups, she creates a peer connection
+object.  onicecandidate is immediately bound to a function that sends ice
+candidates accross as messages, and after making the PC, she createOffer's,
+sets the local media description, then sends an offer message.
+
+It isn't clear when ice candidates are made, but if they are sent to the 
+callee, she will simply enque them.  When the offer is received, she puts it
+at the front of the queue, and then creates a peer connection herself.
+
+CALLEE (FIRST TO JOIN)
+~~~~~~~
+0. Open signalling chanel
+	- onChannelOpened 
+		-> channelReady, maybeStart()
+		-> handler 
+			if type == 'offer' 
+				-> signallingReady, maybeStart()
+				-> unshift message on stack
+			else push message on stack
+1. maybeRequestTurn
+	-> gets a turn server, turnDone, maybeStart()
+2. getUserMedia
+	-> localStream gets set
+
+3. Begins receiving messages from caller, when caller joins
+	-> held on stack
+	-> when offer message is received, signalingReady = true
+	-> finally maybeStart() will pass conditional
+	-> createPeerConnection()
+		-> binds onicecandidate to send ice candidates as a message
+		-> binds onaddstream to pipe the remote stream to itself
+			but this has already been added to the caller, prior to calling
+			so may never fire.
+		-> adds stream --> this will triger onadstream bound method in caller
+	-> processes messages in message queue
+		-> in processing the offer, it will create and send an answer
+
+4. processes offer
+	-> setRemote setRemoteDescription
+		-> setRemoteDescriptionSuccess
+	-> doAnswer
+		-> createAnswer -> setLacalAndSendMessage
+		-> triggers receipt of answer handling in CALLER
+	
+
+
+
+CALLER (SECOND TO JOIN)
+~~~~~~~~~
+0. signalingReady := true
+	Open signalling chanel
+	- onChannelOpened -> channelReady, maybeStart()
+		-> handler -> processSignal()
+1. maybeRequestTurn
+	-> gets a turn server, turnDone, maybeStart()
+2. getUserMedia
+	-> localStream gets set
+3. createPeerConnection() fired as soon as 0, 1, and 2. are complete
+	-> binds onaddstream
+	-> binds onIceCandidate -> sends message with the candidate
+	-> adds stream
+	-> doCall()
+		-> createOffer
+		-> setLocalAndSendMessage
+
+4. Callee adds remote stream, onAddRemoteStream fires:
+	- attaches remote stream, then does waitforremotevideo
+	- repeatedly calls getVideoTracks until it finds them, then does
+		transitiontoactive -> this just changes some of the display properties
+		but doesn't do any actual hook up.  It does make the remotevideo
+		opacity 1 though
+		
+5. Receives answer from callee.
+	-> setRemote setRemoteDescription
+		-> setRemoteDescriptionSuccess

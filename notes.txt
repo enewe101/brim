@@ -1,0 +1,15 @@
+- we need a signalling mechanism
+	- we'll use ajax, with repetitive polling -- crude but should work
+	- messages will be addressed to a room #, randomly generated when the
+		initiator connects.
+	- a database will be used to store rooms and the signalling messages 
+		associated to them
+	- javascript will know the room number and whether the client is the 
+		initiator based on info passed in the initial page from the server
+	- javascript has the timestamp for the last message in the room, so 
+		polls the server for any messages with a later timestamp (getting a
+		list of them (potentially of length zero, one, or many) back.
+	- let signalling.php provide helper functions for room management, as well
+		as posting and putting signals
+
+As step 1, implement the signalling channel using a database.
