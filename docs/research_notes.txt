@@ -1,0 +1,60 @@
+Existing sites
+- scriblar.com
+	* shared whiteboard.
+	* paid if more than two people join
+
+- edmodo.com
+	* like facebook but for teaching
+	* couldn't find any whiteboard area
+
+- sketchpad is wicked, but open source?
+
+Requirements
+- no downloads or plugins
+
+Open source components
+^^^^^^^^^^^^^^^^^^^^^^
+
+It looks like all of this would be best done through webRCT!
+http://www.html5rocks.com/en/tutorials/webrtc/basics/#simpleRTCPeerConnectionExample
+
+Chat
+http://goodcode.io/open-source/
+
+
+Whiteboard
+- svg edit seems good, but maybe overfeatured?
+	* http://code.google.com/p/svg-edit/
+	* i.e. support 6 + 
+
+- Raphael sketchpad
+	* http://ianli.com/sketchpad/
+
+- paper.js seems to offer the framework to support a drawing app
+	* has anyone already built a drawing app on top of paper.js?
+	* good tutorial:
+		http://www.creativebloq.com/html5/use-paperjs-create-html5-interactive-vector-animations-8116862
+
+- there are various oekaki-based applets
+	* seem to be open-source
+
+- groupboard.com
+	* paid, but it seems to give the ability to do paint chat and integrate
+		in own  website
+
+- collab seems to offer what we want
+	+ open source
+	+ uses CRPP - collaborative raster painting protocol
+	- requires JRE
+
+Video stream
+- Screen capture
+- http://stackoverflow.com/questions/5574143/stream-video-in-java
+	* some good suggestions here
+- open voip software http://www.opalvoip.org/
+- left off watching this tutorial http://www.youtube.com/watch?v=2x3Ie6VZ_sg
+
+Future Work
+^^^^^^^^^^^
+Make the site as separate components that can simply be loaded into an iframe
+and connected to dowloadable server software.
