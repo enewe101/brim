@@ -45,16 +45,25 @@
 	</script>
 	<script type="text/javascript" src="js/client.js"></script>
 	<script type="text/javascript" src="js/paper.js"></script>
-	<script type="text/paperscript" src="js/whiteboard.js" canvas="whiteboard">
-	</script>
+	<script type="text/javascript" src="js/whiteboard.js"></script>
 	<script type="text/javascript" src="js/onload.js"></script>
 </head>
 
 <body onload='init()'>
 	<div id='col1'>
+		<div id='messengers'>
+			<textarea id="dataChannelSend" disabled></textarea>
+			<textarea id="dataChannelReceive" disabled></textarea>
+
+			<div id="buttons">
+			  <button id="startButton">Start</button>
+			  <button id="sendButton">Send</button>
+			  <button id="closeButton">Stop</button>
+			</div>
+		</div>
 		<canvas id='whiteboard'></canvas>
-		<a id='lines'>Lines</a>
-		<a id='clouds'>Clouds</a>
+		<a id='pencil_button'>Pencil</a>
+		<a id='cloud_button'>Clouds</a>
 	</div>
 	<div id='col2'>
 		<div id='chats'>

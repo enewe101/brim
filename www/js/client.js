@@ -1,51 +1,110 @@
-// add logic: doCall should only be done if there is a new person who has joined the room
-// Also, doCall should maybeFire as soon as a new person has joined or anything needed
-// for it to preceed is added.  THings needed for it to proceed
-// 	- local stream
-// 	
+	// * //
+	// * // add logic: doCall should only be done if there is a new person who 
+	// * // has joined the room
+	// * // Also, doCall should maybeFire as soon as a new person has joined or
+	// * // anything needed
+	// * //	for it to preceed is added.  THings needed for it to proceed
+	// * // 	- local stream
+	// * //
+
+
+// TODO: there are two functions to close the pc.  There should only be one.
+// TODO: hook up the message sendinp function to the button.
+
+
+
+
+// GLOBALS //
+// * UI elements //
 var message_input;
 var message_pane;
 var localVideo;
 var localStream;
+var dataChannelSend;
+var sendButton;
+var closeButton;
+
+// * Streams and Channels //
 var remoteVideo;
 var remoteStream;
+var sendChannel;
+var receiveChannel;
+
+// * The Peer Connection object //
 var pc;
-var msgQueue = [];
+
+// * Connection settings and state //
 var stereo = false;
 var audio_send_codec = '';
-
-var sdpConstraints = {'mandatory': {
-                      'OfferToReceiveAudio': true,
-                      'OfferToReceiveVideo': true }};
-var pcConfig = {"iceServers": [{"url": "stun:stun.services.mozilla.com"}]};
-var pcConstraints = {"optional": [{"DtlsSrtpKeyAgreement": true}]};
 var offerConstraints = {"optional": [], "mandatory": {}};
 var mediaConstraints = {"audio": true, "video": true};
 var audio_receive_codec = 'opus/48000';
 var gatheredIceCandidateTypes = { Local: {}, Remote: {} };
+var isVideoMuted = false;
+var isAudioMuted = false;
+var sdpConstraints = {
+	'mandatory': {
+		'OfferToReceiveAudio': true,
+		'OfferToReceiveVideo': true 
+	}
+};
+var pcConfig = {
+	"iceServers": [
+		{"url": "stun:stun.services.mozilla.com"}
+	]
+};
+var pcConstraints = {
+	"optional": [
+		{"DtlsSrtpKeyAgreement": true},
+		{RtpDataChannels: true}
+	]
+};
 
-// READINESS STATE //
+// * Signalling state //
+var msgQueue = [];
 var signalling_ready = initiator;
 var localStream = null;
 var started = false;
 var newPeerHere = false
 
-// OTHER STREAM STATE //
-var isVideoMuted = false;
-var isAudioMuted = false;
 
+// INITIALIZATION //
 function init_webrtc() {
-	alert('webrtc');
 	message_input = $('message_input');
 	message_input.onkeydown = check_key;
 	message_pane = $('message_pane');
 	localVideo = $('local_video');
 	remoteVideo = $('remote_video');
-
+	dataChannelSend = $('dataChannelSend');
+	dataChannelReceive = $('dataChannelReceive');
+	sendButton = $('sendButton');
+	closeButton = $('closeButton');
+	
 	begin_polling(2000, message_handler);
 	doGetUserMedia();
 }
 
+
+// TODO: this is duplicating the functionality of close().
+//			Reconcile.
+// TODO: this will have an error if no data channel is open when fired
+//			Cover by disabling the button or its onclick.
+function closeDataChannels() {
+	alert('close data channels!');
+	append_message('Closing data channels');
+
+	sendChannel.close();
+	trace('Closed data channel with label: ' + sendChannel.label);
+	receiveChannel.close();
+	trace('Closed data channel with label: ' + receiveChannel.label);
+	pc.close();
+	pc = null;
+
+	dataChannelSend.value = "";
+	dataChannelReceive.value = "";
+	dataChannelSend.disabled = true;
+	alert('data channels closed!');
+}
 
 function doGetUserMedia() {
 	// Call into getUserMedia via the polyfill (adapter.js).
@@ -89,6 +148,15 @@ function maybeStart() {
 		createPeerConnection();
 		append_message(orange_italic('Adding local stream.'));
 		pc.addStream(localStream);
+		try {
+			sendChannel = pc.createDataChannel("text_data_channel",
+				{reliable: false});
+		} catch (e) {
+			alert('failed to make dataChannel');
+		}
+		sendChannel.onopen = handleSendChannelStateChange;
+		sendChannel.onclase = handleSendChannelStateChange;
+
 		started = true;
 
 		if (initiator) {
@@ -132,6 +200,16 @@ function mergeConstraints(cons1, cons2) {
   return merged;
 }
 
+
+function send_text_and_clear() {
+	append_message('Sending data: ' + data);
+	var data = dataChannelSend.value;
+	sendChannel.send(data);
+	dataChannelSend.value = '';
+	append_message('Sent data: ' + data + '!!');
+}
+
+
 function createPeerConnection() {
 	append_message('Creating RTCPeerConnnection');
 	try {
@@ -144,9 +222,29 @@ function createPeerConnection() {
       return;
   }
 	pc.onaddstream = onRemoteStreamAdded;
+	pc.ondatachannel = gotReceiveChannel;
 	pc.onremovestream = onRemoteStreamRemoved;
 	pc.onsignalingstatechange = onSignalingStateChanged;
 	pc.oniceconnectionstatechange = onIceConnectionStateChanged;
+}
+
+function gotReceiveChannel(event) {
+  append_message('Receive Channel Callback');
+  receiveChannel = event.channel;
+  receiveChannel.onmessage = handleMessage;
+  receiveChannel.onopen = handleReceiveChannelStateChange;
+  receiveChannel.onclose = handleReceiveChannelStateChange;
+}
+
+function handleReceiveChannelStateChange() {
+  var readyState = receiveChannel.readyState;
+  append_message('Receive channel state is: ' + readyState);
+}
+
+// TODO: Should there be a limit on how much chat is buffered?.. maybe not.
+function handleMessage(event) {
+  append_message('Received message: ' + event.data);
+  dataChannelReceive.value = dataChannelReceive.value + '\n' + event.data;
 }
 
 function onRemoteStreamAdded(event) {
@@ -157,6 +255,20 @@ function onRemoteStreamAdded(event) {
   waitForRemoteVideo();
 }
 
+function handleSendChannelStateChange() {
+  var readyState = sendChannel.readyState;
+  append_message('Send channel state is: ' + readyState);
+  if (readyState == "open") {
+    dataChannelSend.disabled = false;
+    dataChannelSend.focus();
+    dataChannelSend.value = "";
+	sendButton.onclick = send_text_and_clear;
+	closeButton.onclick = closeDataChannels;
+  } else {
+    dataChannelSend.disabled = true;
+	alert('handled channel ' + readyState);
+  }
+}
 
 function onRemoteStreamRemoved(event) {
   append_message(orange_italic('Remote stream removed.'));
