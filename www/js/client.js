@@ -1,5 +1,5 @@
 	// * //
-	// * // add logic: doCall should only be done if there is a new person who 
+	// * // This code provides a webRTC connection service to the script
 	// * // has joined the room
 	// * // Also, doCall should maybeFire as soon as a new person has joined or
 	// * // anything needed
@@ -155,7 +155,7 @@ function maybeStart() {
 			alert('failed to make dataChannel');
 		}
 		sendChannel.onopen = handleSendChannelStateChange;
-		sendChannel.onclase = handleSendChannelStateChange;
+		sendChannel.onclose = handleSendChannelStateChange;
 
 		started = true;
 
@@ -255,6 +255,7 @@ function onRemoteStreamAdded(event) {
   waitForRemoteVideo();
 }
 
+
 function handleSendChannelStateChange() {
   var readyState = sendChannel.readyState;
   append_message('Send channel state is: ' + readyState);
@@ -263,6 +264,7 @@ function handleSendChannelStateChange() {
     dataChannelSend.focus();
     dataChannelSend.value = "";
 	sendButton.onclick = send_text_and_clear;
+	
 	closeButton.onclick = closeDataChannels;
   } else {
     dataChannelSend.disabled = true;

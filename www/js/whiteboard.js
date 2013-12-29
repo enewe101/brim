@@ -35,8 +35,13 @@ function init_whiteboard() {
 
 	var cloud_button = $('cloud_button');
 	cloud_button.onclick = acivate_cloud;
+
+	// Create connection to other whiteboad
+	whiteboard_channel = getWhiteboardDataChannel()
 }
 
+function getWhiteboardDataChannel() {
+}
 
 function  acivate_pencil() {
 	toolz['pencil_tool'].activate();

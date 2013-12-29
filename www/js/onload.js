@@ -1,8 +1,10 @@
+var rtc_connection;
+
 function init() {
 	var debug = true;
 	if(debug) {
 		try {
-			init_webrtc();
+			rtc_connection = init_webrtc();
 			init_whiteboard();
 		} catch(e) {
 			alert(e);
@@ -11,5 +13,6 @@ function init() {
 		init_webrtc();
 		init_whiteboard();
 	}
+
 }
 

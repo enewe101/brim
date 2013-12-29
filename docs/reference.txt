@@ -1,0 +1,15 @@
+connection object
+	- The rtc_connection object
+	- provides named channels
+		make_connection
+			returns a connection object 
+			add video send channel(constraints, callback)
+			expect video receive channel(constraints, callback)
+			add audio send channel(constraints, callback)
+			expect audio receieve channel(constraints, callback)
+			add data send channel
+
+	- how much of building an rtc_conneciton can be carried out before 
+		knowing what channels are expected?
+	- can channels be added after the rtc_connection is built?
+
