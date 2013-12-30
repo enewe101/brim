@@ -181,14 +181,19 @@ function RTCConnectionObj() {
 	}(this);
 
 	this.attatch_channel = function(stream) {
-		alert('attach_channel connected');
 		attachMediaStream(localVideo, stream);
+
+		// APPLICATION
 		localVideo.style.opacity = 1;
 		localStream = stream;
-		alert('maybe starting');
+
+		// This should get called from the application but live here
 		this.maybeStart();
 	};
 
+
+	// this could be done in two versions: request_PC, and reply_PC
+	// Request Peer connection
 	this.maybeStart = function() {
 		append_message('maybe start... ');
 
@@ -196,6 +201,8 @@ function RTCConnectionObj() {
 			append_message('Creating PeerConnection.');
 			this.createPeerConnection();
 			append_message('Adding local stream.');
+
+			// this should add from a dict of added streams
 			pc.addStream(localStream);
 			try {
 				sendChannel = pc.createDataChannel("text_data_channel",
@@ -203,6 +210,8 @@ function RTCConnectionObj() {
 			} catch (e) {
 				alert('failed to make dataChannel');
 			}
+
+			// pass a handler to the dict of added streams
 			sendChannel.onopen = this.handleSendChannelStateChange;
 			sendChannel.onclose = this.handleSendChannelStateChange;
 
