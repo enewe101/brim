@@ -81,6 +81,12 @@ window.onbeforeunload = function() {
 
 
 function RTCConnectionObj() {
+
+	this.channels = {
+		'video': {'send':[], 'receive':[]},
+		'data': {'send':[], 'receive':[]}
+	}
+
 	rtc_connection_obj = this;
 
 	this.test = function() {
@@ -180,8 +186,11 @@ function RTCConnectionObj() {
 		};
 	}(this);
 
-	this.attatch_channel = function(stream) {
-		attachMediaStream(localVideo, stream);
+	this.attatch_channel = function(type, stream) {
+		if(type=='video') {
+			this.channels[type]['send'] = stream;
+			attachMediaStream(localVideo, stream);
+		}
 
 		// APPLICATION
 		localVideo.style.opacity = 1;

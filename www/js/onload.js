@@ -48,6 +48,6 @@ function onUserMediaError() {
 }
 
 function add_video_stream(stream) {
-		rtc_connection.attatch_channel(stream);
+	rtc_connection.attatch_channel('video', stream);
 }
 
