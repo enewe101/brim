@@ -22,6 +22,8 @@
 	// The initiator of the room, should not be the initiator
 	// of the call.  Confusing choice of variable names...
 	$initiator = $initiator_id == $client_id? 'false' : 'true';
+	$is_first = $initiator_id == $client_id? 'true' : 'false';
+
 ?>
 <html>
 
@@ -39,6 +41,7 @@
 		var room_id = '<?php echo $room_id; ?>';
 		var client_id = '<?php echo $client_id; ?>';
 		var initiator = <?php echo $initiator; ?>;
+		var is_first = <?php echo $is_first; ?>;
 		var join_timestamp = '<?php echo $join_timestamp; ?>';
 		var last_msg_timestamp = join_timestamp;
 		var last_signal_id = null;

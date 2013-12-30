@@ -1,7 +1,7 @@
 var rtc_connection;
 var get_user_media_handler = {
 	'constraints': mediaConstraints,
-	'on_success': add_video_stream,
+	'on_success': add_streams_then_open,
 	'on_error': onUserMediaError
 }
 
@@ -18,6 +18,10 @@ function init() {
 	} catch(e) {
 		alert('get user media failed: ' + e);
 	}
+
+	// CALL MAYBE START HERE.  RENAME TO SEND_CHANNEL_REQUEST
+	// if not first to arrive, send open channel request
+
 
 	// Initialize the whiteboard
 	init_whiteboard();
@@ -47,7 +51,19 @@ function onUserMediaError() {
 	alert(alert_str);
 }
 
-function add_video_stream(stream) {
-	rtc_connection.attatch_channel('video', stream);
+
+function add_streams_then_open(stream) {
+	rtc_connection.add_video_channel(stream);
+	rtc_connection.add_data_channel('whiteboard')
+
+	attachMediaStream(localVideo, stream);
+	localVideo.style.opacity = 1;
+	localStream = stream;
+
+	// If you are not the first to arrive, then attempt to open an RTC 
+	// connection
+	if(!is_first) {
+		rtc_connection.request_connection();
+	}
 }
 

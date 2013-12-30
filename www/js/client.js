@@ -143,7 +143,7 @@ function RTCConnectionObj() {
 						msgQueue.unshift(messages[i]);
 						append_message('received offer');
 						signalling_ready = true
-						o.maybeStart();
+						o.request_connection();
 					} else {
 						msgQueue.push(messages[i]);
 					}
@@ -182,28 +182,22 @@ function RTCConnectionObj() {
 			localVideo.style.opacity = 1;
 			localStream = stream;
 			// Caller creates PeerConnection.
-			o.maybeStart();
+			o.request_connection();
 		};
 	}(this);
 
-	this.attatch_channel = function(type, stream) {
-		if(type=='video') {
-			this.channels[type]['send'] = stream;
-			attachMediaStream(localVideo, stream);
-		}
+	this.add_data_channel = function(nickname) {
+		this.channels['data']['send'].push(nickname);
+	};
 
-		// APPLICATION
-		localVideo.style.opacity = 1;
-		localStream = stream;
-
-		// This should get called from the application but live here
-		this.maybeStart();
+	this.add_video_channel = function(stream) {
+		this.channels['video']['send'].push(stream);
 	};
 
 
 	// this could be done in two versions: request_PC, and reply_PC
 	// Request Peer connection
-	this.maybeStart = function() {
+	this.request_connection = function() {
 		append_message('maybe start... ');
 
 		if (!started && signalling_ready && localStream) {
@@ -212,7 +206,17 @@ function RTCConnectionObj() {
 			append_message('Adding local stream.');
 
 			// this should add from a dict of added streams
-			pc.addStream(localStream);
+			// make this attatch based on reference in this.channels
+			// instead of localStream global reference
+			//
+			// Is it possible to have multiple video send streams?
+			// i.e. do we need this.channels['video']['send'] to be array?
+			if(this.channels['video']['send'].length) {
+				pc.addStream(this.channels['video']['send'][0]);
+			}
+
+			alert(this.channels['data']['send']);
+
 			try {
 				sendChannel = pc.createDataChannel("text_data_channel",
 					{reliable: false});
@@ -249,7 +253,7 @@ function RTCConnectionObj() {
 		if(message.type == 'join') {
 			append_message('newPeerHere = true');
 			newPeerHere = true;
-			this.maybeStart();
+			this.request_connection();
 		}
 
 		if (!started) {
