@@ -56,10 +56,14 @@ function add_streams_then_open(stream) {
 	rtc_connection.add_video_channel(stream);
 
 	var handler = {
-		'onopen': rtc_connection.handleSendChannelStateChange,
-		'onclose': rtc_connection.handleSendChannelStateChange
+		'onopen': handleSendChannelOpen,
+		'onclose': handleSendChannelClose
 	};
-	rtc_connection.add_data_channel('whiteboard', handler)
+	rtc_connection.add_data_channel('whiteboard_channel', handler)
+	
+	// TODO: build a method in rtc_connection to expect receive channels, and 
+	// the method should allow you to put onReceive handlers for what to do 
+	// when the channels are received
 
 	attachMediaStream(localVideo, stream);
 	localVideo.style.opacity = 1;
@@ -72,3 +76,42 @@ function add_streams_then_open(stream) {
 	}
 }
 
+function handleSendChannelClose() {
+	alert('closed channel');
+	append_message('Send channel state is: ' + readyState);
+	dataChannelSend.disabled = true;
+}
+
+function handleSendChannelOpen() {
+	var readyState = this.readyState;
+	append_message('Send channel state is: ' + readyState);
+
+	dataChannelSend.disabled = false;
+	dataChannelSend.focus();
+	dataChannelSend.value = "";
+
+	sendButton.onclick = arm_send_button(this);
+	closeButton.onclick = closeDataChannels;
+}
+
+function arm_send_button(o) {
+	return function send_text_and_clear() {
+		append_message('Sending data: ' + data);
+		var data = dataChannelSend.value;
+
+		// this should be a method provided by rtc_connection
+		o.send(data);
+
+		dataChannelSend.value = '';
+		append_message('Sent data: ' + data + '!!');
+	};
+}
+
+
+function closeDataChannels() {
+	rtc_connection.close_connection();
+	dataChannelSend.value = "";
+	dataChannelReceive.value = "";
+	dataChannelSend.disabled = true;
+	alert('data channels closed!');
+}
