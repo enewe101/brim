@@ -1,18 +1,13 @@
 var rtc_connection;
 
 function init() {
-	var debug = true;
-	if(debug) {
-		try {
-			rtc_connection = init_webrtc();
-			init_whiteboard();
-		} catch(e) {
-			alert(e);
-		}
-	} else {
-		init_webrtc();
-		init_whiteboard();
+	try {
+		var rtc_connection = new RTCConnectionObj();
+		rtc_connection.init();
+	} catch(e) {
+		alert(e);
 	}
-
+//	init_webrtc();
+	init_whiteboard();
 }
 

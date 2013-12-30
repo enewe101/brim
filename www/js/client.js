@@ -67,67 +67,69 @@ var localStream = null;
 var started = false;
 var newPeerHere = false
 
+var rtc_connection_obj;
 
-// INITIALIZATION //
-function init_webrtc() {
-	message_input = $('message_input');
-	message_input.onkeydown = check_key;
-	message_pane = $('message_pane');
-	localVideo = $('local_video');
-	remoteVideo = $('remote_video');
-	dataChannelSend = $('dataChannelSend');
-	dataChannelReceive = $('dataChannelReceive');
-	sendButton = $('sendButton');
-	closeButton = $('closeButton');
-	
-	begin_polling(2000, message_handler);
-	doGetUserMedia();
+function RTCConnectionObj() {
+	rtc_connection_obj = this;
+
+	this.test = function() {
+		alert('rtc_obj');
+	};
+
+	this.init = function() {
+		message_input = $('message_input');
+		message_input.onkeydown = check_key;
+		message_pane = $('message_pane');
+		localVideo = $('local_video');
+		remoteVideo = $('remote_video');
+		dataChannelSend = $('dataChannelSend');
+		dataChannelReceive = $('dataChannelReceive');
+		sendButton = $('sendButton');
+		closeButton = $('closeButton');
+		
+		begin_polling(2000, message_handler);
+		this.doGetUserMedia();
+	};
+
+	this.doGetUserMedia = function() {
+		// Call into getUserMedia via the polyfill (adapter.js).
+		try {
+			getUserMedia(mediaConstraints, onUserMediaSuccess, onUserMediaError);
+			append_message('local request to access media')
+		} catch (e) {
+			append_message('getUserMedia failed with exception: ' + e.message);
+		}
+	};
+
+
+	this.closeDataChannels = function() {
+		alert('close data channels!');
+		append_message('Closing data channels');
+
+		sendChannel.close();
+		trace('Closed data channel with label: ' + sendChannel.label);
+		receiveChannel.close();
+		trace('Closed data channel with label: ' + receiveChannel.label);
+		pc.close();
+		pc = null;
+
+		dataChannelSend.value = "";
+		dataChannelReceive.value = "";
+		dataChannelSend.disabled = true;
+		alert('data channels closed!');
+	}
+
 }
-
 
 // TODO: this is duplicating the functionality of close().
 //			Reconcile.
 // TODO: this will have an error if no data channel is open when fired
 //			Cover by disabling the button or its onclick.
-function closeDataChannels() {
-	alert('close data channels!');
-	append_message('Closing data channels');
 
-	sendChannel.close();
-	trace('Closed data channel with label: ' + sendChannel.label);
-	receiveChannel.close();
-	trace('Closed data channel with label: ' + receiveChannel.label);
-	pc.close();
-	pc = null;
-
-	dataChannelSend.value = "";
-	dataChannelReceive.value = "";
-	dataChannelSend.disabled = true;
-	alert('data channels closed!');
-}
-
-function doGetUserMedia() {
-	// Call into getUserMedia via the polyfill (adapter.js).
-	try {
-		getUserMedia(mediaConstraints, onUserMediaSuccess, onUserMediaError);
-		append_message(orange_italic('local request to access media'))
-	} catch (e) {
-		append_message(brown_bold('getUserMedia failed with exception: ' + e.message));
-	}
-}
-
-function orange_italic(text) {
-	return "<span class='italic'><span class='orange'>" + text + "</span></span>";
-}
-
-
-function brown_bold(text) {
-	return "<span class='bold'><span class='brown'>" + text + "</span></span>";
-}
 
 
 function onUserMediaSuccess(stream) {
-  append_message(orange_italic('User has granted access to local media.'));
+  append_message('User has granted access to local media.');
   // Call the polyfill wrapper to attach the media stream to this element.
   // unchecked
   attachMediaStream(localVideo, stream);
@@ -139,14 +141,14 @@ function onUserMediaSuccess(stream) {
 
 
 function maybeStart() {
-	append_message(orange_italic('maybe start... '));
+	append_message('maybe start... ');
 
 	// initiator needs to wait for a new peer to arrive, and should have set up it's local stream
 	// visitor needs to wait for an offer, and should have set up localStream
 	if (!started && signalling_ready && localStream) {
-		append_message(orange_italic('Creating PeerConnection.'));
+		append_message('Creating PeerConnection.');
 		createPeerConnection();
-		append_message(orange_italic('Adding local stream.'));
+		append_message('Adding local stream.');
 		pc.addStream(localStream);
 		try {
 			sendChannel = pc.createDataChannel("text_data_channel",
@@ -175,8 +177,8 @@ function maybeStart() {
 function doCall() {
 	append_message('doCall');
   var constraints = mergeConstraints(offerConstraints, sdpConstraints);
-  append_message(orange_italic('Sending offer to peer, with constraints: \n' +
-              '  \'' + JSON.stringify(constraints) + '\'.'))
+  append_message('Sending offer to peer, with constraints: \n' +
+              '  \'' + JSON.stringify(constraints) + '\'.')
   pc.createOffer(setLocalAndSendMessage,
                  onCreateSessionDescriptionError, constraints); // inside setLocal
 }
@@ -218,7 +220,7 @@ function createPeerConnection() {
 		pc.onicecandidate = onIceCandidate; 
 		append_message('Created RTCPeerConnnection');
 	} catch (e) {
-    	append_message(brown_bold('Failed to create PeerConnection, exception: ' + e.message));
+    	append_message('Failed to create PeerConnection, exception: ' + e.message);
       return;
   }
 	pc.onaddstream = onRemoteStreamAdded;
@@ -248,7 +250,7 @@ function handleMessage(event) {
 }
 
 function onRemoteStreamAdded(event) {
-  append_message(orange_italic('Remote stream added.'));
+  append_message('Remote stream added.');
 //  reattachMediaStream(miniVideo, localVideo);
   attachMediaStream(remoteVideo, event.stream);
   remoteStream = event.stream;
@@ -265,7 +267,7 @@ function handleSendChannelStateChange() {
     dataChannelSend.value = "";
 	sendButton.onclick = send_text_and_clear;
 	
-	closeButton.onclick = closeDataChannels;
+	closeButton.onclick = rtc_connection_obj.closeDataChannels;
   } else {
     dataChannelSend.disabled = true;
 	alert('handled channel ' + readyState);
@@ -273,15 +275,15 @@ function handleSendChannelStateChange() {
 }
 
 function onRemoteStreamRemoved(event) {
-  append_message(orange_italic('Remote stream removed.'));
+  append_message('Remote stream removed.');
 }
 
 function onIceConnectionStateChanged(event) {
-  append_message(orange_italic('onIceConnectionStateChanged'));
+  append_message('onIceConnectionStateChanged');
 }
 
 function onSignalingStateChanged(event) {
-  append_message(orange_italic('onSignalStateChange'));
+  append_message('onSignalStateChange');
 }
 
 function waitForRemoteVideo() {
