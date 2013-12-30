@@ -84,7 +84,7 @@ function RTCConnectionObj() {
 
 	this.channels = {
 		'video': {'send':[], 'receive':[]},
-		'data': {'send':[], 'receive':[]}
+		'data': {'send':{}, 'receive':{}}
 	}
 
 	rtc_connection_obj = this;
@@ -155,6 +155,7 @@ function RTCConnectionObj() {
 	}(this);
 
 
+	// make this take a nickname to decide which channels to close
 	this.closeDataChannels = function() {
 		alert('close data channels!');
 		append_message('Closing data channels');
@@ -186,8 +187,10 @@ function RTCConnectionObj() {
 		};
 	}(this);
 
+	// there should be checking to make sure nickname is unique
+	// and is a valid object key
 	this.add_data_channel = function(nickname) {
-		this.channels['data']['send'].push(nickname);
+		this.channels['data']['send'][nickname] = null;
 	};
 
 	this.add_video_channel = function(stream) {
@@ -215,14 +218,15 @@ function RTCConnectionObj() {
 				pc.addStream(this.channels['video']['send'][0]);
 			}
 
-			alert(this.channels['data']['send']);
+			for(chan in this.channels['data']['send']) {
+				alert(this.channels['data']['send'][chan] === null);
 
-			try {
-				sendChannel = pc.createDataChannel("text_data_channel",
-					{reliable: false});
-			} catch (e) {
-				alert('failed to make dataChannel');
+				sendChannel = pc.createDataChannel(
+						"text_data_channel", {reliable: false});
+				this.channels['data']['send'][chan] = sendChannel;
 			}
+//			sendChannel = pc.createDataChannel("text_data_channel",
+//				{reliable: false});
 
 			// pass a handler to the dict of added streams
 			sendChannel.onopen = this.handleSendChannelStateChange;
@@ -515,6 +519,7 @@ function RTCConnectionObj() {
 		};
 	}(this);
 
+	// this should be a callback from the application
 	this.send_text_and_clear = function(o) {
 		return function() {
 			append_message('Sending data: ' + data);
