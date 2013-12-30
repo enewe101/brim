@@ -54,7 +54,12 @@ function onUserMediaError() {
 
 function add_streams_then_open(stream) {
 	rtc_connection.add_video_channel(stream);
-	rtc_connection.add_data_channel('whiteboard')
+
+	var handler = {
+		'onopen': rtc_connection.handleSendChannelStateChange,
+		'onclose': rtc_connection.handleSendChannelStateChange
+	};
+	rtc_connection.add_data_channel('whiteboard', handler)
 
 	attachMediaStream(localVideo, stream);
 	localVideo.style.opacity = 1;

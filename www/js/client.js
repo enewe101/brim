@@ -189,8 +189,9 @@ function RTCConnectionObj() {
 
 	// there should be checking to make sure nickname is unique
 	// and is a valid object key
-	this.add_data_channel = function(nickname) {
-		this.channels['data']['send'][nickname] = null;
+	this.add_data_channel = function(nickname, handler) {
+		handler['stream'] = null;
+		this.channels['data']['send'][nickname] = handler;
 	};
 
 	this.add_video_channel = function(stream) {
@@ -219,18 +220,15 @@ function RTCConnectionObj() {
 			}
 
 			for(chan in this.channels['data']['send']) {
-				alert(this.channels['data']['send'][chan] === null);
-
 				sendChannel = pc.createDataChannel(
 						"text_data_channel", {reliable: false});
-				this.channels['data']['send'][chan] = sendChannel;
-			}
-//			sendChannel = pc.createDataChannel("text_data_channel",
-//				{reliable: false});
 
-			// pass a handler to the dict of added streams
-			sendChannel.onopen = this.handleSendChannelStateChange;
-			sendChannel.onclose = this.handleSendChannelStateChange;
+				// now add handlers from the handler object
+				var new_data_channel = this.channels['data']['send'][chan];
+				new_data_channel['stream'] = sendChannel;
+				sendChannel.onopen = new_data_channel['onopen'];
+				sendChannel.onclose = new_data_channel['onclose'];
+			}
 
 			started = true;
 
