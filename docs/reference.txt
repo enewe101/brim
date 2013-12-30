@@ -13,3 +13,7 @@ connection object
 		knowing what channels are expected?
 	- can channels be added after the rtc_connection is built?
 
+
+Progress:
+	- put functions inside an rtc_connection object 
+	- next: try to move getUserMedia into the application layer

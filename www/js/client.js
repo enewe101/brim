@@ -99,7 +99,7 @@ function RTCConnectionObj() {
 		closeButton = $('closeButton');
 		
 		begin_polling(2000, this.message_handler);
-		this.doGetUserMedia();
+		//this.doGetUserMedia();
 	};
 
 	this.doGetUserMedia = function() {
@@ -169,8 +169,9 @@ function RTCConnectionObj() {
 	this.onUserMediaSuccess = function(o) {
 		return function(stream) {
 			append_message('User has granted access to local media.');
-			// Call the polyfill wrapper to attach the media stream to this element.
-			// unchecked
+
+			// REENTER HERE
+			// re-enter connection object file here
 			attachMediaStream(localVideo, stream);
 			localVideo.style.opacity = 1;
 			localStream = stream;
@@ -178,6 +179,15 @@ function RTCConnectionObj() {
 			o.maybeStart();
 		};
 	}(this);
+
+	this.attatch_channel = function(stream) {
+		alert('attach_channel connected');
+		attachMediaStream(localVideo, stream);
+		localVideo.style.opacity = 1;
+		localStream = stream;
+		alert('maybe starting');
+		this.maybeStart();
+	};
 
 	this.maybeStart = function() {
 		append_message('maybe start... ');
