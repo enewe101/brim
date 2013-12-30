@@ -24,6 +24,11 @@
 	$initiator = $initiator_id == $client_id? 'false' : 'true';
 	$is_first = $initiator_id == $client_id? 'true' : 'false';
 
+	// Put out a link to the room.  User can share this with her partner
+	$room_file_url = 'http://'.$_SERVER['HTTP_HOST'].$_SERVER['PHP_SELF'];
+	$room_id_url = "?room_id=$room_id";
+	$room_url = $room_file_url . $room_id_url;
+
 ?>
 <html>
 
@@ -53,6 +58,7 @@
 </head>
 
 <body onload='init()'>
+<a href='<?php echo $room_url;?>'><?php echo $room_url;?></a>
 	<div id='col1'>
 		<div id='messengers'>
 			<textarea id="dataChannelSend" disabled></textarea>
