@@ -40,6 +40,7 @@
 	<title>getUserMedia</title>
 	<link rel="stylesheet" href="css/main.css" />
 	<script type="text/javascript" src="js/prototype.js"></script>
+	<script type="text/javascript" src="js/clips_lib.js"></script>
 	<script type="text/javascript" src="js/adapter.js"></script>
 	<script type="text/javascript" src="js/signal.js"></script>
 	<script type="text/javascript">

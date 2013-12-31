@@ -12,8 +12,6 @@
 // TODO: hook up the message sendinp function to the button.
 
 
-
-
 // GLOBALS //
 // * UI elements //
 var message_input;
@@ -66,8 +64,6 @@ var localStream = null;
 var started = false;
 var newPeerHere = false
 
-var rtc_connection_obj;
-
 function append_message(msg) {
 	message = new Element('div');
 	message.update(msg);
@@ -81,46 +77,36 @@ window.onbeforeunload = function() {
 
 function RTCConnectionObj() {
 
+
+	// store the channels in the object scope
+	// the channel obj structure is 
+	// this.channels = { <type> : { <dir> : { <channel> : <attribute> }}}
+	// 		Explanation:
+	// 			type: 		(string) 'data' | 'video' 
+	// 			dir: 		(string) 'send'|'receive'>
+	// 			channel:	(string) e.g. 'whiteboard_channel', 'text_channel'
+	//			attribute: 	(string) e.g. 'stream', 'onopen', 'onclose'
 	this.channels = {
 		'video': {'send':[], 'receive':[]},
 		'data': {'send':{}, 'receive':{}}
 	}
 
-	rtc_connection_obj = this;
-
-	this.test = function() {
-		alert('rtc_obj');
-	};
-
+	// TODO: user runs this right after construction: make it fire as part of 
+	// construction?
 	this.init = function() {
-		message_input = $('message_input');
-		message_input.onkeydown = check_key;
-		message_pane = $('message_pane');
-		localVideo = $('local_video');
-		remoteVideo = $('remote_video');
-		dataChannelSend = $('dataChannelSend');
-		dataChannelReceive = $('dataChannelReceive');
-		sendButton = $('sendButton');
-		closeButton = $('closeButton');
-		
+		// TODO: make this into a signalling object, 
+		// separate signalling implementation from rtc_connection obj 
 		begin_polling(2000, this.message_handler);
-		//this.doGetUserMedia();
 	};
 
-	this.doGetUserMedia = function() {
-		// Call into getUserMedia via the polyfill (adapter.js).
-		try {
-			getUserMedia(mediaConstraints, this.onUserMediaSuccess, this.onUserMediaError);
-			append_message('local request to access media')
-		} catch (e) {
-			append_message('getUserMedia failed with exception: ' + e.message);
-		}
-	};
 
 	this.onUserMediaError = function() {
 		append_message('userMediaFalied');
 	};
 
+
+	// TODO: move this out to application.  It will help get the pollign
+	// object ready part of this will probably go to the polling object code
 	this.message_handler = function(o) {
 		return function(response_text) {
 			messages = eval(response_text);
@@ -169,33 +155,24 @@ function RTCConnectionObj() {
 		pc = null;
 	}
 
-	this.onUserMediaSuccess = function(o) {
-		return function(stream) {
-			append_message('User has granted access to local media.');
 
-			// REENTER HERE
-			// re-enter connection object file here
-			attachMediaStream(localVideo, stream);
-			localVideo.style.opacity = 1;
-			localStream = stream;
-			// Caller creates PeerConnection.
-			o.request_connection();
-		};
-	}(this);
-
-	// there should be checking to make sure nickname is unique
-	// and is a valid object key
+	// add channels to the connection before openning it
+	// TODO: this throws an uncaught exception!
 	this.add_data_channel = function(nickname, handler) {
+		if(nickname in this.channels['data']['send']) {
+			throw 'non-unique channel nickname given';
+		}
 		handler['stream'] = null;
 		this.channels['data']['send'][nickname] = handler;
 	};
 
+
+	// Also add video channels -- you need to give it the stream
 	this.add_video_channel = function(stream) {
 		this.channels['video']['send'].push(stream);
 	};
 
 
-	// this could be done in two versions: request_PC, and reply_PC
 	// Request Peer connection
 	this.request_connection = function() {
 		append_message('maybe start... ');
@@ -228,31 +205,56 @@ function RTCConnectionObj() {
 
 			started = true;
 
+			// The initiator makes the offer, the other answers
 			if (initiator) {
-			  this.doCall(); //inside
+			  this.doOffer();
 			} else {
-			  this.calleeStart();
+			  this.doAnser();
 			}
 		} else {
 			append_message("...didn't start");
 		}
 	};
 
-	this.calleeStart = function() {
-	  // Callee starts to process cached offer and other messages.
-	  while (msgQueue.length > 0) {
-		this.processSignalingMessage(msgQueue.shift());
-	  }
+
+	// Create and send a connection offer
+	this.doOffer = function() {
+		append_message('doCall');
+		var constraints = this.mergeConstraints(
+			offerConstraints, sdpConstraints);
+		append_message(
+			'Sending offer to peer, with constraints: \n' +
+			'  \'' + JSON.stringify(constraints) + '\'.')
+		pc.createOffer(
+			this.setLocalAndSendMessage,
+		   	this.onCreateSessionDescriptionError,
+		   	constraints); // inside setLocal
 	};
+
+
+	// Create and send a connection reply
+	this.doAnser = function() {
+		// Callee starts to process cached offer and other messages.
+		// the first message to process will be the answer, which is placed
+		// at the head of the cue.  maybe better to give it a separate spot...
+		while (msgQueue.length > 0) {
+			this.processSignalingMessage(msgQueue.shift());
+		}
+	};
+
 
 	this.processSignalingMessage = function(message) {
 		append_message('processing: ' + message);
 
-		if(message.type == 'join') {
-			append_message('newPeerHere = true');
-			newPeerHere = true;
-			this.request_connection();
-		}
+		// TODO: I don't think this is needed because the joining peer 
+		// initiates using a connection offer.  I think we don't need the join 
+		// signal.
+		//if(message.type == 'join') {
+		//	alert('jain');
+		//	append_message('newPeerHere = true');
+		//	newPeerHere = true;
+		//	this.request_connection();
+		//}
 
 		if (!started) {
 			append_message('peerConnection has not been created yet!');
@@ -269,6 +271,7 @@ function RTCConnectionObj() {
 			this.setRemote(offer);
 			append_message('do answer now');
 			this.doAnswer();
+
 		} else if (message.type === 'answer') {
 			append_message('...reading answer...');
 			try {
@@ -277,6 +280,7 @@ function RTCConnectionObj() {
 				append_message('invalid message: ' + message['message']);
 			}
 			this.setRemote(answer);
+
 		} else if (message.type === 'candidate') {
 			append_message('...reading candidate...');
 			try {
@@ -290,10 +294,12 @@ function RTCConnectionObj() {
 			append_message('...candidate built...');
 			this.noteIceCandidate("Remote", this.iceCandidateType(message.candidate));
 			pc.addIceCandidate(candidate);
+
 		} else if (message.type === 'bye') {
 			this.onRemoteHangup();
 		}
 	};
+
 
 	this.onRemoteHangup = function() {
 	  append_message('Session terminated.');
@@ -466,14 +472,6 @@ function RTCConnectionObj() {
 		append_message('done setting remote');
 	};
 
-	this.doCall = function() {
-		append_message('doCall');
-	  var constraints = this.mergeConstraints(offerConstraints, sdpConstraints);
-	  append_message('Sending offer to peer, with constraints: \n' +
-				  '  \'' + JSON.stringify(constraints) + '\'.')
-	  pc.createOffer(this.setLocalAndSendMessage,
-					 this.onCreateSessionDescriptionError, constraints); // inside setLocal
-	};
 
 	this.mergeConstraints = function(cons1, cons2) {
 	  var merged = cons1;

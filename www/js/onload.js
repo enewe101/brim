@@ -8,6 +8,18 @@ var get_user_media_handler = {
 
 function init() {
 
+	// registration of ui elements ==> move to application layer
+	// where are these being used?
+	message_input = $('message_input');
+	message_input.onkeydown = check_key;
+	message_pane = $('message_pane');
+	localVideo = $('local_video');
+	remoteVideo = $('remote_video');
+	dataChannelSend = $('dataChannelSend');
+	dataChannelReceive = $('dataChannelReceive');
+	sendButton = $('sendButton');
+	closeButton = $('closeButton');
+
 	// Build rtc_connection and initialize
 	rtc_connection = new RTCConnectionObj();
 	rtc_connection.init();
