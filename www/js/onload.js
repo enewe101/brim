@@ -71,8 +71,13 @@ function add_streams_then_open(stream) {
 		'onopen': handleSendChannelOpen,
 		'onclose': handleSendChannelClose
 	};
-	rtc_connection.add_data_channel('whiteboard_channel', handler)
+	rtc_connection.add_data_channel('whiteboard_channel', handler);
 	
+	receive_video_handler = {
+		'onRemoteStreamAdded': onRemoteStreamAdded,
+		'onVideoFlowing': onVideoFlowing
+	}
+	rtc_connection.expect_video_channel(receive_video_handler);
 	// TODO: build a method in rtc_connection to expect receive channels, and 
 	// the method should allow you to put onReceive handlers for what to do 
 	// when the channels are received
@@ -127,3 +132,24 @@ function closeDataChannels() {
 	dataChannelSend.disabled = true;
 	alert('data channels closed!');
 }
+
+function handleReceiveChannelStateChange() {
+  var readyState = receiveChannel.readyState;
+  append_message('Receive channel state is: ' + readyState);
+}
+
+function handleMessage(event) {
+  append_message('Received message: ' + event.data);
+  dataChannelReceive.value = dataChannelReceive.value + '\n' + event.data;
+}
+
+// Handlers for when remote video stream is added, and video starts flowing
+function onRemoteStreamAdded(event) {
+	attachMediaStream(remoteVideo, event.stream);
+}
+
+function onVideoFlowing() {
+	remoteVideo.style.opacity = 1;
+	setTimeout(function() { miniVideo.style.opacity = 1; }, 1000);
+}
+

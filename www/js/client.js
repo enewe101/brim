@@ -10,6 +10,8 @@
 
 // TODO: there are two functions to close the pc.  There should only be one.
 // TODO: hook up the message sendinp function to the button.
+// TODO: make the signalling object its own object, probably give 
+// 	processSignalingMessage as the message handling callback
 
 
 // GLOBALS //
@@ -87,7 +89,7 @@ function RTCConnectionObj() {
 	// 			channel:	(string) e.g. 'whiteboard_channel', 'text_channel'
 	//			attribute: 	(string) e.g. 'stream', 'onopen', 'onclose'
 	this.channels = {
-		'video': {'send':[], 'receive':[]},
+		'video': {'send':[], 'receive': null},
 		'data': {'send':{}, 'receive':{}}
 	}
 
@@ -140,6 +142,7 @@ function RTCConnectionObj() {
 	}(this);
 
 
+	// This duplicates some functionality of this.onRemoteHangup
 	this.close_connection = function() {
 		alert('close data channels!');
 		append_message('Closing data channels');
@@ -172,6 +175,13 @@ function RTCConnectionObj() {
 		this.channels['video']['send'].push(stream);
 	};
 
+	this.expect_data_channel = function(nickname, handler) {
+		this.channels['data']['receive'][nickname] = handler;
+	};
+
+	this.expect_video_channel = function(handler) {
+		this.channels['video']['receive'] = handler;
+	};
 
 	// Request Peer connection
 	this.request_connection = function() {
@@ -179,6 +189,7 @@ function RTCConnectionObj() {
 
 		if (!started && signalling_ready && localStream) {
 			append_message('Creating PeerConnection.');
+			on_add_channel_handlers = null;
 			this.createPeerConnection();
 			append_message('Adding local stream.');
 
@@ -243,6 +254,8 @@ function RTCConnectionObj() {
 	};
 
 
+	// TODO: this should probably be the main callback given to the signalling 
+	// object
 	this.processSignalingMessage = function(message) {
 		append_message('processing: ' + message);
 
@@ -256,11 +269,13 @@ function RTCConnectionObj() {
 		//	this.request_connection();
 		//}
 
+		// It should not be possible to get this condition
 		if (!started) {
-			append_message('peerConnection has not been created yet!');
+			throw 'peerConnection has not been created yet!';
 			return;
 		}
 
+		// Respond to offers
 		if (message.type === 'offer') {
 			append_message('...reading offer...');
 			try {
@@ -272,6 +287,7 @@ function RTCConnectionObj() {
 			append_message('do answer now');
 			this.doAnswer();
 
+		// Respond to answers
 		} else if (message.type === 'answer') {
 			append_message('...reading answer...');
 			try {
@@ -281,6 +297,7 @@ function RTCConnectionObj() {
 			}
 			this.setRemote(answer);
 
+		// Respond to ice candidates
 		} else if (message.type === 'candidate') {
 			append_message('...reading candidate...');
 			try {
@@ -295,12 +312,14 @@ function RTCConnectionObj() {
 			this.noteIceCandidate("Remote", this.iceCandidateType(message.candidate));
 			pc.addIceCandidate(candidate);
 
+		// respond to hangup
 		} else if (message.type === 'bye') {
 			this.onRemoteHangup();
 		}
 	};
 
 
+	// Handle hangup.  Does this duplicate functionality of close_connection?
 	this.onRemoteHangup = function() {
 	  append_message('Session terminated.');
 	  initiator = 0;
@@ -317,6 +336,8 @@ function RTCConnectionObj() {
 		msgQueue.length = 0;
 	};
 
+
+	// helper to sort out ice candidate type
 	this.iceCandidateType = function(candidateSDP) {
 	  if (candidateSDP.indexOf("typ relay ") >= 0)
 		return "TURN";
@@ -327,6 +348,8 @@ function RTCConnectionObj() {
 	  return "UNKNOWN";
 	};
 
+
+	// helper to keep track of ice candidates
 	this.noteIceCandidate = function(location, type) {
 	  if (gatheredIceCandidateTypes[location][type])
 		return;
@@ -334,29 +357,46 @@ function RTCConnectionObj() {
 	  append_message('candidate noted');
 	};
 
+
+	// Produce an answer for RTC offer
 	this.doAnswer = function() {
 		try {
-			pc.createAnswer(this.setLocalAndSendMessage, this.onCreateSessionDescriptionError, sdpConstraints);
+			pc.createAnswer(
+				this.setLocalAndSendMessage,
+			   	this.onCreateSessionDescriptionError,
+			   	sdpConstraints);
+
 		} catch(e) {
 			append_message(e);
 		}
 	};
 
+
 	this.onCreateSessionDescriptionError = function(error) {
-	  append_message('Failed to create session description: ' + error.toString());
+		append_message(
+			'Failed to create session description: ' + error.toString());
 	}
 
 	this.setLocalAndSendMessage = function(o) {
 		return function(sessionDescription) {
-			sessionDescription.sdp = o.maybePreferAudioReceiveCodec(sessionDescription.sdp);
-			pc.setLocalDescription(sessionDescription,
-				o.onSetSessionDescriptionSuccess, o.onSetSessionDescriptionError);
-			//sendMessage(sessionDescription);
+			// Resolve the session description
+			sessionDescription.sdp = o.maybePreferAudioReceiveCodec(
+					sessionDescription.sdp);
+
+			// Set session description locally
+			pc.setLocalDescription(
+				sessionDescription,
+				o.onSetSessionDescriptionSuccess,
+			   	o.onSetSessionDescriptionError);
+
+			// Send the offer | answer
 			typ = initiator? 'offer' : 'answer';
 			append_message('Sending ' + typ + ' to peer');
-			send_message(room_id, client_id, typ, JSON.stringify(sessionDescription));
+			send_message(room_id, client_id, typ, 
+				JSON.stringify(sessionDescription));
 		};
 	}(this);
+
 
 	this.onSetSessionDescriptionError = function(error) {
 	  append_message('Failed to set session description: ' + error.toString());
@@ -473,6 +513,7 @@ function RTCConnectionObj() {
 	};
 
 
+	// helper to merge two constraints objects
 	this.mergeConstraints = function(cons1, cons2) {
 	  var merged = cons1;
 	  for (var name in cons2.mandatory) {
@@ -494,7 +535,8 @@ function RTCConnectionObj() {
 	}
 
 
-
+	// Build the peer connection, which does most of the important actual 
+	// data transfer and its negotiation
 	this.createPeerConnection = function() {
 		append_message('Creating RTCPeerConnnection');
 		try {
@@ -506,12 +548,19 @@ function RTCConnectionObj() {
 			append_message('Failed to create PeerConnection, exception: ' + e.message);
 		  return;
 	  }
+
+		var video_receive_handler = this.channels['video']['receive'];
+		if(video_receive_handler) {
+			alert(video_receive_handler.toSource());
+		}
+
 		pc.onaddstream = this.onRemoteStreamAdded;
 		pc.ondatachannel = this.gotReceiveChannel;
 		pc.onremovestream = this.onRemoteStreamRemoved;
 		pc.onsignalingstatechange = this.onSignalingStateChanged;
 		pc.oniceconnectionstatechange = this.onIceConnectionStateChanged;
 	};
+
 
 	this.onIceConnectionStateChanged = function(event) {
 	  append_message('onIceConnectionStateChanged');
@@ -525,20 +574,21 @@ function RTCConnectionObj() {
 	  append_message('Remote stream removed.');
 	};
 
+
+	// TODO: let the callbacks be placed by the application layer
+	// 	at the same time as specifying the send channels
+	// 	Also need to do the same with the video channel
 	this.gotReceiveChannel = function(o) {
 		return function(event) {
 		  append_message('Receive Channel Callback');
 		  receiveChannel = event.channel;
+
+		  // implement by passing a handler from the application
 		  receiveChannel.onmessage = o.handleMessage;
 		  receiveChannel.onopen = o.handleReceiveChannelStateChange;
 		  receiveChannel.onclose = o.handleReceiveChannelStateChange;
 		};
 	}(this);
-
-	this.handleReceiveChannelStateChange = function() {
-	  var readyState = receiveChannel.readyState;
-	  append_message('Receive channel state is: ' + readyState);
-	};
 
 	this.handleMessage = function(event) {
 	  append_message('Received message: ' + event.data);
@@ -547,35 +597,34 @@ function RTCConnectionObj() {
 
 	this.onRemoteStreamAdded = function(o) {
 		return function(event) {
-		  append_message('Remote stream added.');
-		//  reattachMediaStream(miniVideo, localVideo);
-		  attachMediaStream(remoteVideo, event.stream);
-		  remoteStream = event.stream;
-		  this.waitForRemoteVideo();
+			append_message('Remote stream added.');
+			attachMediaStream(remoteVideo, event.stream);
+			remoteStream = event.stream;
+
+			// Perform client onRemoteStreamAdded callback, if any
+			var receive_callbacks = o.channels['video']['receive'];
+			if(typeof receive_callbacks['onRemoteStreamAdded'] == 'function') {
+				receive_callbacks['onRemoteStreamAdded'](event);
+			}
+
+			// Watch out for video to start comming down the stream
+			o.waitForRemoteVideo();
 		};
 	}(this);
 
 	this.waitForRemoteVideo = function() {
 		append_message('waitForRemoteVideo');
-	  // Call the getVideoTracks method via adapter.js.
-	  videoTracks = remoteStream.getVideoTracks();
-	  if (videoTracks.length === 0 || remoteVideo.currentTime > 0) {
-		this.transitionToActive(); //mostly off
-	  } else {
-		setTimeout(this.waitForRemoteVideo, 100);
-	  }
+		videoTracks = remoteStream.getVideoTracks();
+		if (videoTracks.length === 0 || remoteVideo.currentTime > 0) {
+			var receive_video_callbacks = this.channels['video']['receive'];
+			if(typeof receive_video_callbacks['onVideoFlowing'] == 'function') {
+				receive_video_callbacks['onVideoFlowing']();
+			}
+		} else {
+			setTimeout(this.waitForRemoteVideo, 100);
+		}
 	};
 
-	this.transitionToActive = function() {
-	  remoteVideo.style.opacity = 1;
-	//  card.style.webkitTransform = 'rotateY(180deg)';
-	//  setTimeout(function() { localVideo.src = ''; }, 500);
-	  setTimeout(function() { miniVideo.style.opacity = 1; }, 1000);
-	//  // Reset window display according to the asperio of remote video.
-	//  window.onresize();
-	//  setStatus('<input type=\'button\' id=\'hangup\' value=\'Hang up\' \
-	//            onclick=\'onHangup()\' />');
-	}
 
 	this.onIceCandidate = function(o) {
 		return function(event) {
