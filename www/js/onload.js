@@ -23,17 +23,13 @@ function init() {
 	// Build rtc_connection and initialize
 	rtc_connection = new RTCConnectionObj();
 	rtc_connection.init();
-	
+
 	// Request to get the camera and microphone
 	try {
 		doGetUserMedia(get_user_media_handler);
 	} catch(e) {
 		alert('get user media failed: ' + e);
 	}
-
-	// CALL MAYBE START HERE.  RENAME TO SEND_CHANNEL_REQUEST
-	// if not first to arrive, send open channel request
-
 
 	// Initialize the whiteboard
 	init_whiteboard();
@@ -66,21 +62,37 @@ function onUserMediaError() {
 
 function add_streams_then_open(stream) {
 	rtc_connection.add_video_channel(stream);
-
-	var handler = {
-		'onopen': handleSendChannelOpen,
-		'onclose': handleSendChannelClose
-	};
-	rtc_connection.add_data_channel('whiteboard_channel', handler);
-	
 	receive_video_handler = {
 		'onRemoteStreamAdded': onRemoteStreamAdded,
 		'onVideoFlowing': onVideoFlowing
 	}
 	rtc_connection.expect_video_channel(receive_video_handler);
-	// TODO: build a method in rtc_connection to expect receive channels, and 
-	// the method should allow you to put onReceive handlers for what to do 
-	// when the channels are received
+
+	// add the whiteboard data channels
+	var send_data_handler = {
+		'onopen': handleSendChannelOpen,
+		'onclose': handleSendChannelClose
+	};
+	var receive_data_handler = {
+		'onopen': function(){alert('recive data open');},
+		'onclose': function(){alert('recive data closed');},
+		'onmessage': handleMessage
+	};
+	rtc_connection.add_data_channel('whiteboard_channel', send_data_handler);
+	rtc_connection.expect_data_channel('whiteboard_channel', receive_data_handler);
+
+	// add auxiliary data channel
+	var send_aux_data = {
+		'onopen': handleAuxChannelOpen,
+		'onclose': handleSendChannelClose
+	};
+	var receive_aux_data = {
+		'onopen': function(){},
+		'onclose': function(){},
+		'onmessage': function(e){alert(e.data);}
+	};
+	rtc_connection.add_data_channel('aux_channel', send_aux_data);
+	rtc_connection.expect_data_channel('aux_channel', receive_aux_data);
 
 	attachMediaStream(localVideo, stream);
 	localVideo.style.opacity = 1;
@@ -111,6 +123,28 @@ function handleSendChannelOpen() {
 	closeButton.onclick = closeDataChannels;
 }
 
+function handleAuxChannelOpen() {
+	$('aux').onclick = arm_aux_button(this);
+}
+
+function handleMessage(event) {
+  append_message('Received message: ' + event.data);
+  dataChannelReceive.value = dataChannelReceive.value + '\n' + event.data;
+}
+
+function arm_aux_button(o) {
+	return function send_text_and_clear() {
+		append_message('Sending data: ' + data);
+		var data = dataChannelSend.value;
+
+		// this should be a method provided by rtc_connection
+		o.send(data);
+
+		dataChannelSend.value = '';
+		append_message('Sent data: ' + data + '!!');
+	};
+}
+
 function arm_send_button(o) {
 	return function send_text_and_clear() {
 		append_message('Sending data: ' + data);
@@ -132,17 +166,6 @@ function closeDataChannels() {
 	dataChannelSend.disabled = true;
 	alert('data channels closed!');
 }
-
-function handleReceiveChannelStateChange() {
-  var readyState = receiveChannel.readyState;
-  append_message('Receive channel state is: ' + readyState);
-}
-
-function handleMessage(event) {
-  append_message('Received message: ' + event.data);
-  dataChannelReceive.value = dataChannelReceive.value + '\n' + event.data;
-}
-
 // Handlers for when remote video stream is added, and video starts flowing
 function onRemoteStreamAdded(event) {
 	attachMediaStream(remoteVideo, event.stream);

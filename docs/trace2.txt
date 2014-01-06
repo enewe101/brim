@@ -33,8 +33,10 @@ CALLEE (FIRST TO JOIN)
 				-> signallingReady, maybeStart()
 				-> unshift message on stack
 			else push message on stack
+
 1. maybeRequestTurn
 	-> gets a turn server, turnDone, maybeStart()
+
 2. getUserMedia
 	-> localStream gets set
 
@@ -67,10 +69,13 @@ CALLER (SECOND TO JOIN)
 	Open signalling chanel
 	- onChannelOpened -> channelReady, maybeStart()
 		-> handler -> processSignal()
+
 1. maybeRequestTurn
 	-> gets a turn server, turnDone, maybeStart()
+
 2. getUserMedia
 	-> localStream gets set
+
 3. createPeerConnection() fired as soon as 0, 1, and 2. are complete
 	-> binds onaddstream
 	-> binds onIceCandidate -> sends message with the candidate
@@ -85,7 +90,8 @@ CALLER (SECOND TO JOIN)
 		transitiontoactive -> this just changes some of the display properties
 		but doesn't do any actual hook up.  It does make the remotevideo
 		opacity 1 though
-		
+
 5. Receives answer from callee.
 	-> setRemote setRemoteDescription
 		-> setRemoteDescriptionSuccess
+

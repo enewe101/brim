@@ -1,6 +1,5 @@
 <?php
 	include 'php/signalling.php';
-	$errors = Array();
 	$client_id = new_client_id();
 	$join_timestamp = get_mysql_time();
 
@@ -69,6 +68,7 @@
 			  <button id="startButton">Start</button>
 			  <button id="sendButton">Send</button>
 			  <button id="closeButton">Stop</button>
+			  <button id="aux">Aux</button>
 			</div>
 		</div>
 		<canvas id='whiteboard'></canvas>

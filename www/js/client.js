@@ -79,7 +79,8 @@ window.onbeforeunload = function() {
 
 function RTCConnectionObj() {
 
-
+	this.do_expect_data_channel = false;
+	this.do_expect_video_channel = false;
 	// store the channels in the object scope
 	// the channel obj structure is 
 	// this.channels = { <type> : { <dir> : { <channel> : <attribute> }}}
@@ -153,7 +154,9 @@ function RTCConnectionObj() {
 	
 		// this should be registered to this.channels dictionnary so that it
 		// can be closed by iterating through open registered channels...
-		receiveChannel.close();
+		for(chan in this.channels['data']['receive']) {
+			this.channels['data']['receive'][chan]['stream'].close();
+		}
 		pc.close();
 		pc = null;
 	}
@@ -176,10 +179,12 @@ function RTCConnectionObj() {
 	};
 
 	this.expect_data_channel = function(nickname, handler) {
+		this.do_expect_data_channel = true;
 		this.channels['data']['receive'][nickname] = handler;
 	};
 
 	this.expect_video_channel = function(handler) {
+		this.do_expect_video_channel = true;
 		this.channels['video']['receive'] = handler;
 	};
 
@@ -190,6 +195,10 @@ function RTCConnectionObj() {
 		if (!started && signalling_ready && localStream) {
 			append_message('Creating PeerConnection.');
 			on_add_channel_handlers = null;
+
+			/*
+			 *   PEER CONNECTION CREATED HERE
+			 */
 			this.createPeerConnection();
 			append_message('Adding local stream.');
 
@@ -203,15 +212,17 @@ function RTCConnectionObj() {
 				pc.addStream(this.channels['video']['send'][0]);
 			}
 
-			for(chan in this.channels['data']['send']) {
-				var new_channel = pc.createDataChannel(
-						"text_data_channel", {reliable: false});
+			for(channel_label in this.channels['data']['send']) {
+				var chan = pc.createDataChannel(
+						channel_label, {reliable: false});
+
+				// store the channel in this.channels
+				var send_channels = this.channels['data']['send'];
+				send_channels[channel_label]['stream'] = chan;
 
 				// now add handlers from the handler object
-				var new_data_channel = this.channels['data']['send'][chan];
-				new_data_channel['stream'] = new_channel;
-				new_channel.onopen = new_data_channel['onopen'];
-				new_channel.onclose = new_data_channel['onclose'];
+				chan.onopen = send_channels[channel_label]['onopen'];
+				chan.onclose = send_channels[channel_label]['onclose'];
 			}
 
 			started = true;
@@ -549,13 +560,12 @@ function RTCConnectionObj() {
 		  return;
 	  }
 
-		var video_receive_handler = this.channels['video']['receive'];
-		if(video_receive_handler) {
-			alert(video_receive_handler.toSource());
+		if(this.do_expect_video_channel) {
+			pc.onaddstream = this.onRemoteStreamAdded;
 		}
-
-		pc.onaddstream = this.onRemoteStreamAdded;
-		pc.ondatachannel = this.gotReceiveChannel;
+		if(this.do_expect_data_channel) {
+			pc.ondatachannel = this.gotReceiveChannel;
+		}
 		pc.onremovestream = this.onRemoteStreamRemoved;
 		pc.onsignalingstatechange = this.onSignalingStateChanged;
 		pc.oniceconnectionstatechange = this.onIceConnectionStateChanged;
@@ -575,18 +585,22 @@ function RTCConnectionObj() {
 	};
 
 
-	// TODO: let the callbacks be placed by the application layer
-	// 	at the same time as specifying the send channels
-	// 	Also need to do the same with the video channel
 	this.gotReceiveChannel = function(o) {
 		return function(event) {
-		  append_message('Receive Channel Callback');
-		  receiveChannel = event.channel;
+			append_message('Receive Channel Callback');
+			receiveChannel = event.channel;
+			var chan = event.channel;
 
-		  // implement by passing a handler from the application
-		  receiveChannel.onmessage = o.handleMessage;
-		  receiveChannel.onopen = o.handleReceiveChannelStateChange;
-		  receiveChannel.onclose = o.handleReceiveChannelStateChange;
+			var label = chan.label;
+			var expected_data = o.channels['data']['receive'];
+
+			if(expected_data[label]) {
+				// implement by passing a handler from the application
+				receiveChannel.onmessage = expected_data[label]['onmessage'];
+				receiveChannel.onopen = expected_data[label]['onopen'];
+				receiveChannel.onclose = expected_data[label]['onclose'];
+				expected_data[label]['stream'] = chan;
+			}
 		};
 	}(this);
 
@@ -597,8 +611,8 @@ function RTCConnectionObj() {
 
 	this.onRemoteStreamAdded = function(o) {
 		return function(event) {
-			append_message('Remote stream added.');
-			attachMediaStream(remoteVideo, event.stream);
+			console.log('Remote stream added.');
+
 			remoteStream = event.stream;
 
 			// Perform client onRemoteStreamAdded callback, if any

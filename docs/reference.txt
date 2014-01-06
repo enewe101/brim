@@ -1,3 +1,6 @@
+open source turn server
+- http://www.dialogic.com/den/forums/t/10238.aspx
+
 connection object
 	- The rtc_connection object
 	- provides named channels
@@ -17,3 +20,6 @@ connection object
 Progress:
 	- put functions inside an rtc_connection object 
 	- next: try to move getUserMedia into the application layer
+
+Muting Streams
+https://hacks.mozilla.org/2013/09/webrtc-update-and-workarounds/
