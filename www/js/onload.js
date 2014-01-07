@@ -1,4 +1,5 @@
 var rtc_connection;
+var signaller;
 var get_user_media_handler = {
 	'constraints': mediaConstraints,
 	'on_success': add_streams_then_open,
@@ -8,10 +9,10 @@ var get_user_media_handler = {
 
 function init() {
 
+
 	// registration of ui elements ==> move to application layer
 	// where are these being used?
 	message_input = $('message_input');
-	message_input.onkeydown = check_key;
 	message_pane = $('message_pane');
 	localVideo = $('local_video');
 	remoteVideo = $('remote_video');
@@ -20,8 +21,11 @@ function init() {
 	sendButton = $('sendButton');
 	closeButton = $('closeButton');
 
+	// Build signalling channel
+	signaller = new Signaller(message_input, message_pane);
+
 	// Build rtc_connection and initialize
-	rtc_connection = new RTCConnectionObj();
+	rtc_connection = new RTCConnectionObj(signaller);
 	rtc_connection.init();
 
 	// Request to get the camera and microphone
@@ -49,7 +53,7 @@ var doGetUserMedia = function(handler) {
 	// continue with building the channel...
 	var h = handler;
 	getUserMedia(h['constraints'], h['on_success'], h['on_error']);	
-	append_message('local request to access media')
+	signaller.append_message('local request to access media')
 }
 
 
@@ -74,8 +78,8 @@ function add_streams_then_open(stream) {
 		'onclose': handleSendChannelClose
 	};
 	var receive_data_handler = {
-		'onopen': function(){alert('recive data open');},
-		'onclose': function(){alert('recive data closed');},
+		'onopen': function(){},
+		'onclose': function(){},
 		'onmessage': handleMessage
 	};
 	rtc_connection.add_data_channel('whiteboard_channel', send_data_handler);
@@ -100,20 +104,22 @@ function add_streams_then_open(stream) {
 
 	// If you are not the first to arrive, then attempt to open an RTC 
 	// connection
+	rtc_connection.openAndCall();
 	if(!is_first) {
-		rtc_connection.request_connection();
+		rtc_connection.doOffer();
+	} else {
+		rtc_connection.expectOffer();
 	}
 }
 
 function handleSendChannelClose() {
-	alert('closed channel');
-	append_message('Send channel state is: ' + readyState);
+	signaller.append_message('Send channel state is: ' + readyState);
 	dataChannelSend.disabled = true;
 }
 
 function handleSendChannelOpen() {
 	var readyState = this.readyState;
-	append_message('Send channel state is: ' + readyState);
+	signaller.append_message('Send channel state is: ' + readyState);
 
 	dataChannelSend.disabled = false;
 	dataChannelSend.focus();
@@ -128,33 +134,33 @@ function handleAuxChannelOpen() {
 }
 
 function handleMessage(event) {
-  append_message('Received message: ' + event.data);
+  signaller.append_message('Received message: ' + event.data);
   dataChannelReceive.value = dataChannelReceive.value + '\n' + event.data;
 }
 
 function arm_aux_button(o) {
 	return function send_text_and_clear() {
-		append_message('Sending data: ' + data);
+		signaller.append_message('Sending data: ' + data);
 		var data = dataChannelSend.value;
 
 		// this should be a method provided by rtc_connection
 		o.send(data);
 
 		dataChannelSend.value = '';
-		append_message('Sent data: ' + data + '!!');
+		signaller.append_message('Sent data: ' + data + '!!');
 	};
 }
 
 function arm_send_button(o) {
 	return function send_text_and_clear() {
-		append_message('Sending data: ' + data);
+		signaller.append_message('Sending data: ' + data);
 		var data = dataChannelSend.value;
 
 		// this should be a method provided by rtc_connection
 		o.send(data);
 
 		dataChannelSend.value = '';
-		append_message('Sent data: ' + data + '!!');
+		signaller.append_message('Sent data: ' + data + '!!');
 	};
 }
 
