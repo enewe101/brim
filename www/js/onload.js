@@ -1,7 +1,7 @@
 var rtc_connection;
 var signaller;
 var get_user_media_handler = {
-	'constraints': {"audio": true, "video": true},
+	'constraints': mediaConstraints,
 	'on_success': add_streams_then_open,
 	'on_error': onUserMediaError
 }
