@@ -9,11 +9,10 @@ var get_user_media_handler = {
 
 function init() {
 
-
 	// registration of ui elements ==> move to application layer
 	// where are these being used?
-	message_input = $('message_input');
-	message_pane = $('message_pane');
+	var message_input = $('message_input');
+	var message_pane = $('message_pane');
 	localVideo = $('local_video');
 	remoteVideo = $('remote_video');
 	dataChannelSend = $('dataChannelSend');
@@ -21,8 +20,13 @@ function init() {
 	sendButton = $('sendButton');
 	closeButton = $('closeButton');
 
-	// Build signalling channel
-	signaller = new Signaller(message_input, message_pane);
+	// Build signalling channel with messaging pane
+	var message_box = [message_input, message_pane];
+	var ids = [room_id, client_id];
+	signaller = new Signaller(ids, message_box);
+
+	// Build signalling channel without messaging pane
+	//signaller = new Signaller();
 
 	// Build rtc_connection and initialize
 	rtc_connection = new RTCConnectionObj(signaller);

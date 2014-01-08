@@ -101,6 +101,7 @@
 		}
 	}
 
+
 	function post($room, $client_id, $type, $message) {
 		$query = "INSERT INTO signals SET room_id='$room'";
 		$query .= ", client_id='$client_id', type='$type'";

@@ -16,8 +16,6 @@
 
 // GLOBALS //
 // * UI elements //
-var message_input;
-var message_pane;
 var localVideo;
 var localStream;
 var dataChannelSend;
@@ -68,7 +66,7 @@ var newPeerHere = false
 
 
 window.onbeforeunload = function() {
-	signaller.send_message(room_id, client_id, 'bye', "{'type':'bye'}");
+	signaller.send_message('bye', "{'type':'bye'}");
 }
 
 
@@ -399,8 +397,7 @@ function RTCConnectionObj(signaller) {
 			// Send the offer | answer
 			typ = initiator? 'offer' : 'answer';
 			signaller.append_message('Sending ' + typ + ' to peer');
-			o.signaller.send_message(room_id, client_id, typ, 
-				JSON.stringify(sessionDescription));
+			o.signaller.send_message(typ, JSON.stringify(sessionDescription));
 		};
 	}(this);
 
@@ -666,7 +663,7 @@ function RTCConnectionObj(signaller) {
 	this.onIceCandidate = function(o) {
 		return function(event) {
 			if(event.candidate) {
-				o.signaller.send_message(room_id, client_id, 'candidate', JSON.stringify({
+				o.signaller.send_message('candidate', JSON.stringify({
 					type: 'candidate',
 					label: event.candidate.sdpMLineIndex,
 					id: event.candidate.sdpMid,
