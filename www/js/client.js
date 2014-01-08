@@ -14,16 +14,6 @@
 // 	processSignalingMessage as the message handling callback
 
 
-// GLOBALS //
-
-// * Streams and Channels //
-var remoteVideo;
-var remoteStream;
-var receiveChannel;
-
-// * The Peer Connection object //
-var pc = null;
-
 // * Connection settings and state //
 var stereo = false;
 var audio_send_codec = '';
@@ -62,6 +52,7 @@ window.onbeforeunload = function() {
 
 
 function RTCConnectionObj(signaller) {
+	this.pc = null;
 	this.ready_for_offers = false
 	this.signaller = signaller;
 	this.do_expect_data_channel = false;
@@ -145,8 +136,8 @@ function RTCConnectionObj(signaller) {
 		console.log('Creating RTCPeerConnnection');
 		try {
 			// Create an RTCPeerConnection via the polyfill (adapter.js).
-			pc = new RTCPeerConnection(pcConfig, pcConstraints);
-			pc.onicecandidate = this.onIceCandidate; 
+			this.pc = new RTCPeerConnection(pcConfig, pcConstraints);
+			this.pc.onicecandidate = this.onIceCandidate; 
 			console.log('Created RTCPeerConnnection');
 		} catch (e) {
 			console.log(
@@ -155,23 +146,23 @@ function RTCConnectionObj(signaller) {
 		}
 
 		if(this.do_expect_video_channel) {
-			pc.onaddstream = this.onRemoteStreamAdded;
+			this.pc.onaddstream = this.onRemoteStreamAdded;
 		}
 		if(this.do_expect_data_channel) {
-			pc.ondatachannel = this.gotReceiveChannel;
+			this.pc.ondatachannel = this.gotReceiveChannel;
 		}
-		pc.onremovestream = this.onRemoteStreamRemoved;
-		pc.onsignalingstatechange = this.onSignalingStateChanged;
-		pc.oniceconnectionstatechange = this.onIceConnectionStateChanged;
+		this.pc.onremovestream = this.onRemoteStreamRemoved;
+		this.pc.onsignalingstatechange = this.onSignalingStateChanged;
+		this.pc.oniceconnectionstatechange = this.onIceConnectionStateChanged;
 
 		console.log('Adding local streams.');
 
 		if(this.channels['video']['send'].length) {
-			pc.addStream(this.channels['video']['send'][0]);
+			this.pc.addStream(this.channels['video']['send'][0]);
 		}
 
 		for(channel_label in this.channels['data']['send']) {
-			var chan = pc.createDataChannel(
+			var chan = this.pc.createDataChannel(
 					channel_label, {reliable: false});
 
 			// store the channel in this.channels
@@ -199,7 +190,7 @@ function RTCConnectionObj(signaller) {
 		signaller.append_message(
 			'Sending offer to peer, with constraints: \n' +
 			'  \'' + JSON.stringify(constraints) + '\'.')
-		pc.createOffer(
+		this.pc.createOffer(
 			this.setLocalAndSendMessage,
 		   	this.onCreateSessionDescriptionError,
 		   	constraints); // inside setLocal
@@ -221,7 +212,7 @@ function RTCConnectionObj(signaller) {
 	// Produce an answer for RTC offer
 	this.doAnswer = function() {
 		try {
-			pc.createAnswer(
+			this.pc.createAnswer(
 				this.setLocalAndSendMessage,
 			   	this.onCreateSessionDescriptionError,
 			   	sdpConstraints);
@@ -290,7 +281,7 @@ function RTCConnectionObj(signaller) {
 											 candidate: message.candidate});
 			signaller.append_message('...candidate built...');
 			this.noteIceCandidate("Remote", this.iceCandidateType(message.candidate));
-			pc.addIceCandidate(candidate);
+			this.pc.addIceCandidate(candidate);
 
 		// respond to hangup
 		} else if (message.type === 'bye') {
@@ -307,7 +298,7 @@ function RTCConnectionObj(signaller) {
 		return function(event) {
 			console.log('Remote stream added.');
 
-			remoteStream = event.stream;
+			o.channels['video']['send']['stream'] = event.stream;
 
 			// Perform client onRemoteStreamAdded callback, if any
 			var receive_callbacks = o.channels['video']['receive'];
@@ -322,8 +313,12 @@ function RTCConnectionObj(signaller) {
 
 	this.waitForRemoteVideo = function() {
 		signaller.append_message('waitForRemoteVideo');
-		videoTracks = remoteStream.getVideoTracks();
-		if (videoTracks.length === 0 || remoteVideo.currentTime > 0) {
+		videoTracks = o.channels['video']['send']['stream'].getVideoTracks();
+
+		// Originally remoteVideo was a global containing the video html
+		// element to which the remote stream gets attached.
+		//if (videoTracks.length === 0 || remoteVideo.currentTime > 0) {
+		if (videoTracks.length === 0) {
 			var receive_video_callbacks = this.channels['video']['receive'];
 			if(typeof receive_video_callbacks['onVideoFlowing'] == 'function') {
 				receive_video_callbacks['onVideoFlowing']();
@@ -367,17 +362,18 @@ function RTCConnectionObj(signaller) {
 	this.gotReceiveChannel = function(o) {
 		return function(event) {
 			signaller.append_message('Receive Channel Callback');
-			receiveChannel = event.channel;
 			var chan = event.channel;
-
 			var label = chan.label;
-			var expected_data = o.channels['data']['receive'];
 
-			if(expected_data[label]) {
-				// implement by passing a handler from the application
-				receiveChannel.onmessage = expected_data[label]['onmessage'];
-				receiveChannel.onopen = expected_data[label]['onopen'];
-				receiveChannel.onclose = expected_data[label]['onclose'];
+			if(label in o.channels['data']['receive']) {
+
+				// bind the callbacks passed in from the application
+				var short_name = o.channels['data']['receive'][label];
+				chan.onmessage = short_name['onmessage'];
+				chan.onopen = short_name['onopen'];
+				chan.onclose = short_name['onclose'];
+
+				// store the data channel
 				expected_data[label]['stream'] = chan;
 			}
 		};
@@ -401,8 +397,8 @@ function RTCConnectionObj(signaller) {
 		for(chan in this.channels['data']['receive']) {
 			this.channels['data']['receive'][chan]['stream'].close();
 		}
-		pc.close();
-		pc = null;
+		this.pc.close();
+		this.pc = null;
 	}
 
 	// Handle hangup.  Does this duplicate functionality of close_connection?
@@ -418,8 +414,8 @@ function RTCConnectionObj(signaller) {
 		this.got_offer = false;
 		isAudioMuted = false;
 		isVideoMuted = false;
-		pc.close();
-		pc = null;
+		this.pc.close();
+		this.pc = null;
 		msgQueue.length = 0;
 	};
 
@@ -458,7 +454,7 @@ function RTCConnectionObj(signaller) {
 					sessionDescription.sdp);
 
 			// Set session description locally
-			pc.setLocalDescription(
+			o.pc.setLocalDescription(
 				sessionDescription,
 				o.onSetSessionDescriptionSuccess,
 			   	o.onSetSessionDescriptionError);
@@ -581,7 +577,7 @@ function RTCConnectionObj(signaller) {
 		signaller.append_message('set preference');
 		var sd = new RTCSessionDescription(message);
 		signaller.append_message('made remote description obj');
-		pc.setRemoteDescription(sd,
+		this.pc.setRemoteDescription(sd,
 			this.onSetSessionDescriptionSuccess, this.onSetSessionDescriptionError);
 		signaller.append_message('done setting remote');
 	};
