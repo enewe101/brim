@@ -59,10 +59,8 @@ var pcConstraints = {
 
 // * Signalling state //
 var msgQueue = [];
-var signalling_ready = initiator;
 var localStream = null;
-var started = false;
-var newPeerHere = false
+var started = initiator;
 
 
 window.onbeforeunload = function() {
@@ -71,6 +69,7 @@ window.onbeforeunload = function() {
 
 
 function RTCConnectionObj(signaller) {
+	this.ready_for_offers = false
 	this.signaller = signaller;
 	this.do_expect_data_channel = false;
 	this.do_expect_video_channel = false;
@@ -96,13 +95,9 @@ function RTCConnectionObj(signaller) {
 	};
 
 
-	this.onUserMediaError = function() {
-		signaller.append_message('userMediaFalied');
-	};
-
-
-	// TODO: move this out to application.  It will help get the pollign
-	// object ready part of this will probably go to the polling object code
+	// callback when receiving signalling messages
+	// note that the non-initiator equeues messages until she is ready
+	// to start processing them
 	this.message_handler = function(o) {
 		return function(parsed_message) {
 			// for other message types, enque if you are not ready
@@ -110,8 +105,8 @@ function RTCConnectionObj(signaller) {
 				if(parsed_message.type == 'offer') {
 					msgQueue.unshift(parsed_message);
 					signaller.append_message('received offer');
-					signalling_ready = true
-					o.request_connection();
+					o.got_offer = true;
+					o.maybe_start_processing_signals();
 				} else {
 					msgQueue.push(parsed_message);
 				}
@@ -120,26 +115,6 @@ function RTCConnectionObj(signaller) {
 			}
 		}
 	}(this);
-
-
-
-	// This duplicates some functionality of this.onRemoteHangup
-	this.close_connection = function() {
-		alert('close data channels!');
-		signaller.append_message('Closing data channels');
-
-		for(chan in this.channels['data']['send']) {
-			this.channels['data']['send'][chan]['stream'].close();
-		}
-	
-		// this should be registered to this.channels dictionnary so that it
-		// can be closed by iterating through open registered channels...
-		for(chan in this.channels['data']['receive']) {
-			this.channels['data']['receive'][chan]['stream'].close();
-		}
-		pc.close();
-		pc = null;
-	}
 
 
 	// add channels to the connection before openning it
@@ -215,22 +190,12 @@ function RTCConnectionObj(signaller) {
 			chan.onclose = send_channels[channel_label]['onclose'];
 		}
 
-		started = true;
 	};
 
-
-	// Request Peer connection
-	this.request_connection = function() {
-		signaller.append_message('maybe start... ');
-
-		if (!started && signalling_ready && localStream) {
-			this.doAnser();
-		} else {
-			signaller.append_message("...didn't start");
-		}
-	};
 
 	this.expectOffer = function() {
+		this.ready_for_offers = true;
+		this.maybe_start_processing_signals();
 	};
 
 	// Create and send a connection offer
@@ -249,12 +214,14 @@ function RTCConnectionObj(signaller) {
 
 
 	// Create and send a connection reply
-	this.doAnser = function() {
-		// Callee starts to process cached offer and other messages.
-		// the first message to process will be the answer, which is placed
-		// at the head of the cue.  maybe better to give it a separate spot...
-		while (msgQueue.length > 0) {
-			this.processSignalingMessage(msgQueue.shift());
+	this.maybe_start_processing_signals = function() {
+		if (!started && this.got_offer && this.ready_for_offers) {
+			started = true;
+			while (msgQueue.length > 0) {
+				this.processSignalingMessage(msgQueue.shift());
+			}
+		} else {
+			signaller.append_message("...didn't start");
 		}
 	};
 
@@ -267,7 +234,7 @@ function RTCConnectionObj(signaller) {
 			   	sdpConstraints);
 
 		} catch(e) {
-			signaller.append_message(e);
+			signaller.append_message('error sending answer: ' + e);
 		}
 	};
 
@@ -289,10 +256,12 @@ function RTCConnectionObj(signaller) {
 
 		// It should not be possible to get this condition
 		if (!started) {
+			alert('not started!');
 			throw 'peerConnection has not been created yet!';
 			return;
 		}
 
+		signaller.append_message('<strong>' + message.type + '</strong>');
 		// Respond to offers
 		if (message.type === 'offer') {
 			signaller.append_message('...reading offer...');
@@ -337,6 +306,112 @@ function RTCConnectionObj(signaller) {
 	};
 
 
+	this.onUserMediaError = function() {
+		signaller.append_message('userMediaFalied');
+	};
+
+	this.onRemoteStreamAdded = function(o) {
+		return function(event) {
+			console.log('Remote stream added.');
+
+			remoteStream = event.stream;
+
+			// Perform client onRemoteStreamAdded callback, if any
+			var receive_callbacks = o.channels['video']['receive'];
+			if(typeof receive_callbacks['onRemoteStreamAdded'] == 'function') {
+				receive_callbacks['onRemoteStreamAdded'](event);
+			}
+
+			// Watch out for video to start comming down the stream
+			o.waitForRemoteVideo();
+		};
+	}(this);
+
+	this.waitForRemoteVideo = function() {
+		signaller.append_message('waitForRemoteVideo');
+		videoTracks = remoteStream.getVideoTracks();
+		if (videoTracks.length === 0 || remoteVideo.currentTime > 0) {
+			var receive_video_callbacks = this.channels['video']['receive'];
+			if(typeof receive_video_callbacks['onVideoFlowing'] == 'function') {
+				receive_video_callbacks['onVideoFlowing']();
+			}
+		} else {
+			setTimeout(this.waitForRemoteVideo, 100);
+		}
+	};
+
+
+	this.onIceCandidate = function(o) {
+		return function(event) {
+			if(event.candidate) {
+				o.signaller.send_message('candidate', JSON.stringify({
+					type: 'candidate',
+					label: event.candidate.sdpMLineIndex,
+					id: event.candidate.sdpMid,
+					candidate: event.candidate.candidate}));
+				o.noteIceCandidate("Local", o.iceCandidateType(event.candidate.candidate));
+			} else {
+			  signaller.append_message('End of candidates.');
+			}
+		};
+	}(this);
+
+	this.onIceConnectionStateChanged = function(event) {
+	  signaller.append_message('onIceConnectionStateChanged');
+	};
+
+
+	this.onSignalingStateChanged = function(event) {
+	  signaller.append_message('onSignalStateChange');
+	};
+
+
+	this.onRemoteStreamRemoved = function(event) {
+	  signaller.append_message('Remote stream removed.');
+	};
+
+
+	this.gotReceiveChannel = function(o) {
+		return function(event) {
+			signaller.append_message('Receive Channel Callback');
+			receiveChannel = event.channel;
+			var chan = event.channel;
+
+			var label = chan.label;
+			var expected_data = o.channels['data']['receive'];
+
+			if(expected_data[label]) {
+				// implement by passing a handler from the application
+				receiveChannel.onmessage = expected_data[label]['onmessage'];
+				receiveChannel.onopen = expected_data[label]['onopen'];
+				receiveChannel.onclose = expected_data[label]['onclose'];
+				expected_data[label]['stream'] = chan;
+			}
+		};
+	}(this);
+
+
+	// TODO: merge close_connection() and onRemoteHangup() or indicate what
+	// their unique purposes are in a short comment
+
+	// This duplicates some functionality of this.onRemoteHangup
+	this.close_connection = function() {
+		alert('close data channels!');
+		signaller.append_message('Closing data channels');
+
+		for(chan in this.channels['data']['send']) {
+			this.channels['data']['send'][chan]['stream'].close();
+		}
+	
+		// this should be registered to this.channels dictionnary so that it
+		// can be closed by iterating through open registered channels...
+		for(chan in this.channels['data']['receive']) {
+			this.channels['data']['receive'][chan]['stream'].close();
+		}
+		pc.close();
+		pc = null;
+	}
+
 	// Handle hangup.  Does this duplicate functionality of close_connection?
 	this.onRemoteHangup = function() {
 	  signaller.append_message('Session terminated.');
@@ -346,7 +421,8 @@ function RTCConnectionObj(signaller) {
 
 	this.stop = function() {
 		started = false;
-		signalling_ready = false;
+		this.ready_for_offers = false;
+		this.got_offer = false;
 		isAudioMuted = false;
 		isVideoMuted = false;
 		pc.close();
@@ -376,11 +452,11 @@ function RTCConnectionObj(signaller) {
 	};
 
 
-
 	this.onCreateSessionDescriptionError = function(error) {
 		signaller.append_message(
 			'Failed to create session description: ' + error.toString());
 	}
+
 
 	this.setLocalAndSendMessage = function(o) {
 		return function(sessionDescription) {
@@ -403,11 +479,12 @@ function RTCConnectionObj(signaller) {
 
 
 	this.onSetSessionDescriptionError = function(error) {
-	  signaller.append_message('Failed to set session description: ' + error.toString());
+		signaller.append_message(
+			'Failed to set session description: ' + error.toString());
 	}
 
 	this.onSetSessionDescriptionSuccess = function() {
-	  signaller.append_message('Set session description success.');
+		signaller.append_message('Set session description success.');
 	}
 
 	this.maybePreferAudioReceiveCodec = function(sdp) {
@@ -539,141 +616,6 @@ function RTCConnectionObj(signaller) {
 	}
 
 
-	// Build the peer connection, which does most of the important actual 
-	// data transfer and its negotiation
-	this.makePeerConnection = function() {
-		console.log('Creating RTCPeerConnnection');
-		try {
-			// Create an RTCPeerConnection via the polyfill (adapter.js).
-			pc = new RTCPeerConnection(pcConfig, pcConstraints);
-			pc.onicecandidate = this.onIceCandidate; 
-			console.log('Created RTCPeerConnnection');
-		} catch (e) {
-			console.log(
-			'Failed to create PeerConnection, exception: ' + e.message);
-			return;
-		}
-
-		if(this.do_expect_video_channel) {
-			pc.onaddstream = this.onRemoteStreamAdded;
-		}
-		if(this.do_expect_data_channel) {
-			pc.ondatachannel = this.gotReceiveChannel;
-		}
-		pc.onremovestream = this.onRemoteStreamRemoved;
-		pc.onsignalingstatechange = this.onSignalingStateChanged;
-		pc.oniceconnectionstatechange = this.onIceConnectionStateChanged;
-	};
-
-	// Build the peer connection, which does most of the important actual 
-	// data transfer and its negotiation
-	this.createPeerConnection = function() {
-		console.log('Creating RTCPeerConnnection');
-		try {
-			// Create an RTCPeerConnection via the polyfill (adapter.js).
-			pc = new RTCPeerConnection(pcConfig, pcConstraints);
-			pc.onicecandidate = this.onIceCandidate; 
-			console.log('Created RTCPeerConnnection');
-		} catch (e) {
-			console.log(
-			'Failed to create PeerConnection, exception: ' + e.message);
-			return;
-		}
-
-		if(this.do_expect_video_channel) {
-			pc.onaddstream = this.onRemoteStreamAdded;
-		}
-		if(this.do_expect_data_channel) {
-			pc.ondatachannel = this.gotReceiveChannel;
-		}
-		pc.onremovestream = this.onRemoteStreamRemoved;
-		pc.onsignalingstatechange = this.onSignalingStateChanged;
-		pc.oniceconnectionstatechange = this.onIceConnectionStateChanged;
-	};
-
-
-	this.onIceConnectionStateChanged = function(event) {
-	  signaller.append_message('onIceConnectionStateChanged');
-	};
-
-	this.onSignalingStateChanged = function(event) {
-	  signaller.append_message('onSignalStateChange');
-	};
-
-	this.onRemoteStreamRemoved = function(event) {
-	  signaller.append_message('Remote stream removed.');
-	};
-
-
-	this.gotReceiveChannel = function(o) {
-		return function(event) {
-			signaller.append_message('Receive Channel Callback');
-			receiveChannel = event.channel;
-			var chan = event.channel;
-
-			var label = chan.label;
-			var expected_data = o.channels['data']['receive'];
-
-			if(expected_data[label]) {
-				// implement by passing a handler from the application
-				receiveChannel.onmessage = expected_data[label]['onmessage'];
-				receiveChannel.onopen = expected_data[label]['onopen'];
-				receiveChannel.onclose = expected_data[label]['onclose'];
-				expected_data[label]['stream'] = chan;
-			}
-		};
-	}(this);
-
-	this.handleMessage = function(event) {
-	  signaller.append_message('Received message: ' + event.data);
-	  dataChannelReceive.value = dataChannelReceive.value + '\n' + event.data;
-	};
-
-	this.onRemoteStreamAdded = function(o) {
-		return function(event) {
-			console.log('Remote stream added.');
-
-			remoteStream = event.stream;
-
-			// Perform client onRemoteStreamAdded callback, if any
-			var receive_callbacks = o.channels['video']['receive'];
-			if(typeof receive_callbacks['onRemoteStreamAdded'] == 'function') {
-				receive_callbacks['onRemoteStreamAdded'](event);
-			}
-
-			// Watch out for video to start comming down the stream
-			o.waitForRemoteVideo();
-		};
-	}(this);
-
-	this.waitForRemoteVideo = function() {
-		signaller.append_message('waitForRemoteVideo');
-		videoTracks = remoteStream.getVideoTracks();
-		if (videoTracks.length === 0 || remoteVideo.currentTime > 0) {
-			var receive_video_callbacks = this.channels['video']['receive'];
-			if(typeof receive_video_callbacks['onVideoFlowing'] == 'function') {
-				receive_video_callbacks['onVideoFlowing']();
-			}
-		} else {
-			setTimeout(this.waitForRemoteVideo, 100);
-		}
-	};
-
-
-	this.onIceCandidate = function(o) {
-		return function(event) {
-			if(event.candidate) {
-				o.signaller.send_message('candidate', JSON.stringify({
-					type: 'candidate',
-					label: event.candidate.sdpMLineIndex,
-					id: event.candidate.sdpMid,
-					candidate: event.candidate.candidate}));
-				o.noteIceCandidate("Local", o.iceCandidateType(event.candidate.candidate));
-			} else {
-			  signaller.append_message('End of candidates.');
-			}
-		};
-	}(this);
 
 
 }

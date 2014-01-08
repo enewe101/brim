@@ -5,6 +5,28 @@ var get_user_media_handler = {
 	'on_success': add_streams_then_open,
 	'on_error': onUserMediaError
 }
+receive_video_handler = {
+	'onRemoteStreamAdded': onRemoteStreamAdded,
+	'onVideoFlowing': onVideoFlowing
+}
+var send_data_handler = {
+	'onopen': handleSendChannelOpen,
+	'onclose': handleSendChannelClose
+};
+var receive_data_handler = {
+	'onopen': function(){},
+	'onclose': function(){},
+	'onmessage': handleMessage
+};
+var send_aux_data = {
+	'onopen': handleAuxChannelOpen,
+	'onclose': handleSendChannelClose
+};
+var receive_aux_data = {
+	'onopen': function(){},
+	'onclose': function(){},
+	'onmessage': function(e){alert(e.data);}
+};
 
 
 function init() {
@@ -26,7 +48,7 @@ function init() {
 	signaller = new Signaller(ids, message_box);
 
 	// Build signalling channel without messaging pane
-	//signaller = new Signaller();
+	//signaller = new Signaller(ids);
 
 	// Build rtc_connection and initialize
 	rtc_connection = new RTCConnectionObj(signaller);
@@ -69,39 +91,20 @@ function onUserMediaError() {
 
 
 function add_streams_then_open(stream) {
+	// add video streams
 	rtc_connection.add_video_channel(stream);
-	receive_video_handler = {
-		'onRemoteStreamAdded': onRemoteStreamAdded,
-		'onVideoFlowing': onVideoFlowing
-	}
 	rtc_connection.expect_video_channel(receive_video_handler);
 
 	// add the whiteboard data channels
-	var send_data_handler = {
-		'onopen': handleSendChannelOpen,
-		'onclose': handleSendChannelClose
-	};
-	var receive_data_handler = {
-		'onopen': function(){},
-		'onclose': function(){},
-		'onmessage': handleMessage
-	};
 	rtc_connection.add_data_channel('whiteboard_channel', send_data_handler);
-	rtc_connection.expect_data_channel('whiteboard_channel', receive_data_handler);
+	rtc_connection.expect_data_channel(
+		'whiteboard_channel', receive_data_handler);
 
 	// add auxiliary data channel
-	var send_aux_data = {
-		'onopen': handleAuxChannelOpen,
-		'onclose': handleSendChannelClose
-	};
-	var receive_aux_data = {
-		'onopen': function(){},
-		'onclose': function(){},
-		'onmessage': function(e){alert(e.data);}
-	};
 	rtc_connection.add_data_channel('aux_channel', send_aux_data);
 	rtc_connection.expect_data_channel('aux_channel', receive_aux_data);
 
+	// feed the local video stream back into local video viewer
 	attachMediaStream(localVideo, stream);
 	localVideo.style.opacity = 1;
 	localStream = stream;
