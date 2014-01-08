@@ -7,39 +7,51 @@
 	// * // 	- local stream
 	// * //
 
-
-// TODO: there are two functions to close the pc.  There should only be one.
-// TODO: hook up the message sendinp function to the button.
-// TODO: make the signalling object its own object, probably give 
-// 	processSignalingMessage as the message handling callback
-
-
-// * Connection settings and state //
-
-// * Signalling state //
-
-
-window.onbeforeunload = function() {
-	signaller.send_message('bye', "{'type':'bye'}");
-}
-
+// SEQUENCE OF EVENTS DURING SIGNALLING
+//
+// The first agent to arive in the room is passive.  The second agent to arrive
+// is the 'initiator' (has initiator = true).
+//
+// Both agents will have getusermedia called by the application, and will have
+// add this stream, any data channels, and register handlers for expected
+// remote channels.  After this, they will both have open() called, making
+// the peer connection.
+//
+// The active agent will then have doOffer() called, which causes it to
+// produce an offer.  It is ready to respond to signalling messages coming 
+// the passive agent.
+//
+// The passive agent initially doesn't respond to signalling messages, but only
+// enqueues them for later.  Only after it has 1) received the offer from
+// the initiator and 2) had expectOffer() called, will it respond to signalling
+// messages, starting with the offer.
+//
+// Both 1) and 2) lead to a call to maybe_start_processing_signals(), which
+// only works when the latter of the two fires.  It is not certain precicely
+// which will happen first because these events are asynchronous.
+//
+// Execution of 1) sets this.got_offer = true; while execution of 2) sets
+// this.ready_for_offers = true;  Both are conditions needed for 
+// maybe_start_processing_signals() to pass its conditional.
+//
+// This works for now, but ultimately, I want a mechanism that allows agents
+// to come and go, and be able to create and end peer connections as they do.
+// It should be managed by calls from the application layer.
+//
+// For example, maybe the client's application layer would use the signalling 
+// channel to broadcast a 'ping', and then all other clients would echo a 
+// 'pong', and this would allow the ready client to issue offers to all pongs.
 
 function RTCConnectionObj(signaller) {
 	this.msgQueue = [];
 	this.started = initiator;
 	this.pc = null;
-	this.ready_for_offers = false
+	this.ready_for_offers = false;
+	this.got_offer;
 	this.signaller = signaller;
 	this.do_expect_data_channel = false;
 	this.do_expect_video_channel = false;
-	// store the channels in the object scope
-	// the channel obj structure is 
-	// this.channels = { <type> : { <dir> : { <channel> : <attribute> }}}
-	// 		Explanation:
-	// 			type: 		(string) 'data' | 'video' 
-	// 			dir: 		(string) 'send'|'receive'>
-	// 			channel:	(string) e.g. 'whiteboard_channel', 'text_channel'
-	//			attribute: 	(string) e.g. 'stream', 'onopen', 'onclose'
+
 	this.channels = {
 		'video': {'send':[], 'receive': null},
 		'data': {'send':{}, 'receive':{}}
@@ -77,6 +89,15 @@ function RTCConnectionObj(signaller) {
 		// TODO: make this into a signalling object, 
 		// separate signalling implementation from rtc_connection obj 
 		this.signaller.open(this.message_handler);
+
+		// TODO: this should register to onbeforeunload, but not overwrite it
+		// fix this after migrating to jquery, since it provides facility for
+		// this.
+		window.onbeforeunload = function(o) {
+			return function() {
+				o.signaller.send_message('bye', "{'type':'bye'}");
+			};
+		}(this);
 	};
 
 
@@ -129,7 +150,7 @@ function RTCConnectionObj(signaller) {
 	};
 
 	// Request Peer connection
-	this.openAndCall = function() {
+	this.open = function() {
 
 		/*
 		 *   PEER CONNECTION CREATED HERE

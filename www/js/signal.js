@@ -55,41 +55,35 @@ function Signaller(ids, message_box) {
 	this.open = function(callback, milli_interval) {
 		this.onmessage = callback;
 		milli_interval = milli_interval || 2000;
-		setInterval(this.doPoll, milli_interval);
+		setInterval(this.poll, milli_interval);
 	}
 
 
+	this.poll = function(o) {
+		return function(type) {
+			// 'type' allows you to poll selectively for messages having a 
+			// given type set in the type field.  It's optional and not 
+			// actually used anywhere right now.
+			type = type || '';
 
+			var parameters = {
+				'room_id': o.room_id,
+				'client_id':  o.client_id,
+				'type': type,
+				'last_msg_timestamp':  o.last_msg_timestamp
+			};
 
-	this.doPoll = function(o){
-		return function() {
-			o.poll(null);
+			new Ajax.Request('php/poll.php', {
+				'method': 'post',
+				'parameters': parameters,
+				'onSuccess':  o.message_handler,
+				'onFailure': function(transport) {
+					alert('failure!');
+				}
+			});
 		};
 	}(this);
 
-
-	this.poll = function(type) {
-		// 'type' allows you to poll selectively for messages having a given
-		// type set in the type field.  It's optional and not actually used 
-		// anywhere right now.
-		type = type || '';
-
-		var parameters = {
-			'room_id':this.room_id,
-			'client_id': this.client_id,
-			'type': type,
-			'last_msg_timestamp': this.last_msg_timestamp
-		};
-
-		new Ajax.Request('php/poll.php', {
-			'method': 'post',
-			'parameters': parameters,
-			'onSuccess': this.message_handler,
-			'onFailure': function(transport) {
-				alert('failure!');
-			}
-		});
-	}
 
 	this.message_handler = function(o) {
 		return function(response) {
@@ -119,10 +113,14 @@ function Signaller(ids, message_box) {
 		};
 	}(this);
 
+
 	this.emit = function(msg) {
-		this.append_message("<span class='green'><span class='bold'>You: </span>" + msg + "<\span>")
+		var text_msg = "<span class='green'><span class='bold'>You: </span>";
+		text_msg +=	msg + "<\span>"
+		this.append_message(text_msg)
 		this.send_message('message', msg);
 	}
+
 
 	this.is_new_signal = function(val) {
 		if(this.last_signal_id === null){
@@ -133,6 +131,7 @@ function Signaller(ids, message_box) {
 		
 		return false;
 	}
+
 
 	this.send_message = function(type, msg) {
 		var parameters = {
@@ -153,6 +152,7 @@ function Signaller(ids, message_box) {
 		});
 	};
 
+
 	this.check_key = function(o) {
 		return function(e) {
 			var evtobj=window.event? event : e;
@@ -164,9 +164,12 @@ function Signaller(ids, message_box) {
 		}	
 	}(this);
 
+
+	// only enable manual text messaging if we have a text input!
 	if(this.message_input) {
 		this.message_input.onkeydown = this.check_key;
 	}
+
 
 	// only enable append_message if we have a message pane!
 	this.append_message = function(msg) {};

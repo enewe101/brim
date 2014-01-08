@@ -1,5 +1,17 @@
+/*    GLOBALS	 */
+
+// connection objects
 var rtc_connection;
 var signaller;
+
+// UI elements //
+var localVideo;
+var dataChannelSend;
+var sendButton;
+var closeButton;
+var remoteVideo;
+
+// settings and handlers
 var get_user_media_handler = {
 	'constraints': {"audio": true, "video": true},
 	'on_success': add_streams_then_open,
@@ -28,12 +40,8 @@ var receive_aux_data = {
 	'onmessage': function(e){alert(e.data);}
 };
 
-// * UI elements //
-var localVideo;
-var dataChannelSend;
-var sendButton;
-var closeButton;
-var remoteVideo;
+/*  end GLOBALS	 */
+
 
 function init() {
 
@@ -116,7 +124,7 @@ function add_streams_then_open(stream) {
 
 	// If you are not the first to arrive, then attempt to open an RTC 
 	// connection
-	rtc_connection.openAndCall();
+	rtc_connection.open();
 	if(!is_first) {
 		rtc_connection.doOffer();
 	} else {
