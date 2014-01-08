@@ -28,6 +28,12 @@ var receive_aux_data = {
 	'onmessage': function(e){alert(e.data);}
 };
 
+// * UI elements //
+var localVideo;
+var dataChannelSend;
+var sendButton;
+var closeButton;
+var remoteVideo;
 
 function init() {
 
@@ -107,7 +113,6 @@ function add_streams_then_open(stream) {
 	// feed the local video stream back into local video viewer
 	attachMediaStream(localVideo, stream);
 	localVideo.style.opacity = 1;
-	localStream = stream;
 
 	// If you are not the first to arrive, then attempt to open an RTC 
 	// connection

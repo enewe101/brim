@@ -15,12 +15,6 @@
 
 
 // GLOBALS //
-// * UI elements //
-var localVideo;
-var localStream;
-var dataChannelSend;
-var sendButton;
-var closeButton;
 
 // * Streams and Channels //
 var remoteVideo;
@@ -59,7 +53,6 @@ var pcConstraints = {
 
 // * Signalling state //
 var msgQueue = [];
-var localStream = null;
 var started = initiator;
 
 
