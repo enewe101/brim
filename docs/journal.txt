@@ -7,3 +7,29 @@
 	process, surprisingly, one bug was introduced where scope was being lost
 	on a callback, whereas it was not before.  I'm not sure how such a 
 	bug was masked by prototype (there was indeed some incorrect code.).
+
+	Turned whiteboard into an object.  Left tool-constructors outside.  Maybe
+	tools are their own objects.
+
+	Now I need to decide how to send directives over the wire.
+		var message = {
+			"action" : "create",
+			"path_no" : 0+,
+			"strokeColor": <color>,
+			"start" : <point>,
+		}
+
+	The sender of the message is assumed to be provided as a separate argument
+	to the handle_message command of the whiteboard.
+
+	At the moment, The sender Id is not actually being sent correctly.
+	I intend to implement, as part of the RTC connection, tying a sender id
+	to a send channel, so that every time a send channel fires it's 
+	onmessage event, it provides the event, and the sender.  This means that
+	the sender ID should be gotten when the channel is first opened, which
+	doesn't happen right now.  For the time being, I the whiteboard doesn't
+	know the sender, and simply uses the static user id 'other'.  Knowing
+	the sender is important to be able to hold the curpath of different
+	senders.  An alternative is to have the sender always send her id, and
+	this, concatenated with her path_num would provide unique addressing of
+	paths, and eleminate the need for keeping curpath state for each peer...			
