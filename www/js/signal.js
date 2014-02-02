@@ -73,26 +73,36 @@ function Signaller(ids, message_box) {
 				'last_msg_timestamp':  o.last_msg_timestamp
 			};
 
-			new Ajax.Request('php/poll.php', {
-				'method': 'post',
-				'parameters': parameters,
-				'onSuccess':  o.message_handler,
-				'onFailure': function(transport) {
-					alert('failure!');
+			$.ajax({
+				'url' : 'php/poll.php',
+				'type': 'POST',
+				'data': parameters,
+				'dataType': 'json',
+				'success': o.message_handler,
+				'error': function(jqXHR, status, err) {
+					alert(err);
 				}
 			});
+
+//			new Ajax.Request('php/poll.php', {
+//				'method': 'post',
+//				'parameters': parameters,
+//				'onSuccess':  o.message_handler,
+//				'onFailure': function(transport) {
+//					alert('failure!');
+//				}
+//			});
 		};
 	}(this);
 
 
 	this.message_handler = function(o) {
-		return function(response) {
-			var messages = eval(response.responseText);
+		return function(messages) {
 			messages = messages.filter(o.is_new_signal);
 
 			for(var i=0; i<messages.length; i++) { 
 				// signalling object
-				this.last_signal_id = messages[i]['signal_id'];
+				o.last_signal_id = messages[i]['signal_id'];
 				o.last_msg_timestamp = messages[i]['timestamp'];
 				var msg = messages[i]['message'];
 
@@ -116,21 +126,23 @@ function Signaller(ids, message_box) {
 
 	this.emit = function(msg) {
 		var text_msg = "<span class='green'><span class='bold'>You: </span>";
-		text_msg +=	msg + "<\span>"
+		text_msg +=	msg + "</span>"
 		this.append_message(text_msg)
 		this.send_message('message', msg);
 	}
 
 
-	this.is_new_signal = function(val) {
-		if(this.last_signal_id === null){
-			return true;
-		} else if(val['signal_id'] > this.last_signal_id) {
-			return true;
-		}
+	this.is_new_signal = function(o) {
+		return function(val) {
+			if(o.last_signal_id === null){
+				return true;
+			} else if(val['signal_id'] > o.last_signal_id) {
+				return true;
+			}
 		
-		return false;
-	}
+			return false;
+		};
+	}(this);
 
 
 	this.send_message = function(type, msg) {
@@ -141,23 +153,33 @@ function Signaller(ids, message_box) {
 			'message': msg
 		};
 
-		new Ajax.Request('php/post.php', {
-			'method': 'post',
-			'parameters': parameters,
-			'onSuccess': function(transport) {
+		$.ajax({
+			'url' : 'php/post.php',
+			'type': 'POST',
+			'data': parameters,
+			'dataType': 'text',
+			'success': function(transport) {
 			},
-			'onFailure': function(transport) {
-				alert('failure!');
+			'error': function(jqXHR, status, err) {
+				alert(err);
 			}
 		});
+
+//		new Ajax.Request('php/post.php', {
+//			'method': 'post',
+//			'parameters': parameters,
+//			'onSuccess': function(transport) {
+//			},
+//			'onFailure': function(transport) {
+//				alert('failure!');
+//			}
+//		});
 	};
 
 
 	this.check_key = function(o) {
 		return function(e) {
-			var evtobj=window.event? event : e;
-			var unicode=evtobj.charCode? evtobj.charCode : evtobj.keyCode;
-			if (unicode==13) {
+			if (e.which == 13) {
 				o.emit(this.value);
 				this.value = '';
 			}
@@ -167,7 +189,7 @@ function Signaller(ids, message_box) {
 
 	// only enable manual text messaging if we have a text input!
 	if(this.message_input) {
-		this.message_input.onkeydown = this.check_key;
+		this.message_input.on('keydown', this.check_key);
 	}
 
 
@@ -175,9 +197,8 @@ function Signaller(ids, message_box) {
 	this.append_message = function(msg) {};
 	if(this.message_pane) {
 		this.append_message = function(msg) {
-			var message = new Element('div');
-			message.update(msg);
-			this.message_pane.insert({'bottom':message});
+			var message = $('<div>' + msg + '</div>');
+			this.message_pane.append(message);
 		}
 	} 
 }

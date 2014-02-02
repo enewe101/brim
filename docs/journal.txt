@@ -1,0 +1,9 @@
+1 Feb 2014
+	I am planning to hookup peer's whiteboards this weekend.  
+	I decided that, before embarking on that, I should fully convert to jQuery
+	instead of prototype, before prototype gets too embedded.
+
+	Successfully converted to jQuery.  This did break everything in the 
+	process, surprisingly, one bug was introduced where scope was being lost
+	on a callback, whereas it was not before.  I'm not sure how such a 
+	bug was masked by prototype (there was indeed some incorrect code.).

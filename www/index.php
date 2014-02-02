@@ -1,8 +1,12 @@
 <?php
 	include 'php/signalling.php';
+	
+	// Client gets it's client id;
 	$client_id = new_client_id();
 	$join_timestamp = get_mysql_time();
 
+	// Client joins a room.  The room could be specified in the url otherwise
+	// a random room is made.
 	if(isset($_GET['room_id'])) {
 		$room_id = $_GET['room_id'];
 		if(strlen($room_id) != 6) {
@@ -15,15 +19,19 @@
 		$room_id = new_room($client_id);
 	}
 
+	// Join the room.  A join room signal will be broadcast by the server on
+	// the client's behalf, even before the signaller is built on the client.
+	// Maybe you want to let client send join message with her signaller
 	join_room($room_id, $client_id);
 	$initiator_id = get_initiator($room_id);
 
-	// The initiator of the room, should not be the initiator
-	// of the call.  Confusing choice of variable names...
+	// The initiator of the room is passive, and waits for newcommers to 
+	// initiate.  Hence, the room initiator is never the call-initiator!
 	$initiator = $initiator_id == $client_id? 'false' : 'true';
 	$is_first = $initiator_id == $client_id? 'true' : 'false';
 
-	// Put out a link to the room.  User can share this with her partner
+	// Generate a url for this room.  Users might share by email or IM to 
+	// get connected
 	$room_file_url = 'http://'.$_SERVER['HTTP_HOST'].$_SERVER['PHP_SELF'];
 	$room_id_url = "?room_id=$room_id";
 	$room_url = $room_file_url . $room_id_url;
@@ -38,11 +46,13 @@
 	<base target="_blank">
 	<title>getUserMedia</title>
 	<link rel="stylesheet" href="css/main.css" />
-	<script type="text/javascript" src="js/prototype.js"></script>
+	<script type='text/javascript' src='../../common/js/jquery.js'>
 	<script type="text/javascript" src="js/clips_lib.js"></script>
 	<script type="text/javascript" src="js/adapter.js"></script>
 	<script type="text/javascript" src="js/signal.js"></script>
 	<script type="text/javascript">
+
+		// This passes php-computed values on the server to the client js
 		var room_id = '<?php echo $room_id; ?>';
 		var client_id = '<?php echo $client_id; ?>';
 		var initiator = <?php echo $initiator; ?>;
@@ -50,8 +60,9 @@
 		var join_timestamp = '<?php echo $join_timestamp; ?>';
 		var last_msg_timestamp = join_timestamp;
 		var last_signal_id = null;
+
 	</script>
-	<script type="text/javascript" src="js/client.js"></script>
+	<script type="text/javascript" src="js/rtc.js"></script>
 	<script type="text/javascript" src="js/paper.js"></script>
 	<script type="text/javascript" src="js/whiteboard.js"></script>
 	<script type="text/javascript" src="js/onload.js"></script>

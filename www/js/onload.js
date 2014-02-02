@@ -47,19 +47,20 @@ function init() {
 
 	// registration of ui elements ==> move to application layer
 	// where are these being used?
-	var message_input = $('message_input');
-	var message_pane = $('message_pane');
-	localVideo = $('local_video');
-	remoteVideo = $('remote_video');
-	dataChannelSend = $('dataChannelSend');
-	dataChannelReceive = $('dataChannelReceive');
-	sendButton = $('sendButton');
-	closeButton = $('closeButton');
+	var message_input = $('#message_input');
+	var message_pane = $('#message_pane');
+	localVideo = $('#local_video');
+	remoteVideo = $('#remote_video');
+	dataChannelSend = $('#dataChannelSend');
+	dataChannelReceive = $('#dataChannelReceive');
+	sendButton = $('#sendButton');
+	closeButton = $('#closeButton');
 
 	// Build signalling channel with messaging pane
 	var message_box = [message_input, message_pane];
 	var ids = [room_id, client_id];
 	signaller = new Signaller(ids, message_box);
+
 
 	// Build signalling channel without messaging pane
 	//signaller = new Signaller(ids);
@@ -119,8 +120,8 @@ function add_streams_then_open(stream) {
 	rtc_connection.expect_data_channel('aux_channel', receive_aux_data);
 
 	// feed the local video stream back into local video viewer
-	attachMediaStream(localVideo, stream);
-	localVideo.style.opacity = 1;
+	attachMediaStream(localVideo.get(0), stream);
+	localVideo.fadeIn("slow");
 
 	// If you are not the first to arrive, then attempt to open an RTC 
 	// connection
@@ -134,39 +135,39 @@ function add_streams_then_open(stream) {
 
 function handleSendChannelClose() {
 	signaller.append_message('Send channel state is: ' + readyState);
-	dataChannelSend.disabled = true;
+	dataChannelSend.prop('disabled', true);
 }
 
 function handleSendChannelOpen() {
 	var readyState = this.readyState;
 	signaller.append_message('Send channel state is: ' + readyState);
 
-	dataChannelSend.disabled = false;
+	dataChannelSend.prop('disabled', false);
 	dataChannelSend.focus();
-	dataChannelSend.value = "";
+	dataChannelSend.val("");
 
-	sendButton.onclick = arm_send_button(this);
-	closeButton.onclick = closeDataChannels;
+	sendButton.on('click', arm_send_button(this));
+	closeButton.on('click', closeDataChannels);
 }
 
 function handleAuxChannelOpen() {
-	$('aux').onclick = arm_aux_button(this);
+	$('#aux').on('click', arm_aux_button(this));
 }
 
 function handleMessage(event) {
   signaller.append_message('Received message: ' + event.data);
-  dataChannelReceive.value = dataChannelReceive.value + '\n' + event.data;
+  dataChannelReceive.val(dataChannelReceive.val() + '\n' + event.data);
 }
 
 function arm_aux_button(o) {
 	return function send_text_and_clear() {
 		signaller.append_message('Sending data: ' + data);
-		var data = dataChannelSend.value;
+		var data = dataChannelSend.val();
 
 		// this should be a method provided by rtc_connection
 		o.send(data);
 
-		dataChannelSend.value = '';
+		dataChannelSend.val('');
 		signaller.append_message('Sent data: ' + data + '!!');
 	};
 }
@@ -174,12 +175,12 @@ function arm_aux_button(o) {
 function arm_send_button(o) {
 	return function send_text_and_clear() {
 		signaller.append_message('Sending data: ' + data);
-		var data = dataChannelSend.value;
+		var data = dataChannelSend.val();
 
 		// this should be a method provided by rtc_connection
 		o.send(data);
 
-		dataChannelSend.value = '';
+		dataChannelSend.val('');
 		signaller.append_message('Sent data: ' + data + '!!');
 	};
 }
@@ -187,18 +188,18 @@ function arm_send_button(o) {
 
 function closeDataChannels() {
 	rtc_connection.close_connection();
-	dataChannelSend.value = "";
-	dataChannelReceive.value = "";
-	dataChannelSend.disabled = true;
+	dataChannelSend.val("");
+	dataChannelReceive.val("");
+	dataChannelSend.prop('disabled', true);
 	alert('data channels closed!');
 }
 // Handlers for when remote video stream is added, and video starts flowing
 function onRemoteStreamAdded(event) {
-	attachMediaStream(remoteVideo, event.stream);
+	attachMediaStream(remoteVideo.get(0), event.stream);
 }
 
 function onVideoFlowing() {
-	remoteVideo.style.opacity = 1;
+	remoteVideo.fadeIn("slow");
 	setTimeout(function() { miniVideo.style.opacity = 1; }, 1000);
 }
 

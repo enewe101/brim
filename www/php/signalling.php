@@ -132,37 +132,39 @@
 		} else if(mysqli_num_rows($result)){
 			echo result2json($result);
 		} else {
-			echo '([])';
+			echo '[]';
 		}
 	}
 
 	function result2json($result) {
-		$array_literal = '([';
+		$array_literal = '[';
 		$row_sep = '';
 		while($row = mysqli_fetch_assoc($result)) {
 			$array_literal .= $row_sep . '{';
 			$sep = '';
 			foreach($row as $field_name => $value) {
-				$array_literal .= "$sep '$field_name': ";
-				if(is_string($value)) {
+				$array_literal .= "$sep \"$field_name\": ";
+
+				if(is_numeric($value)) {
+					$array_literal .= $value;
+				}else if(is_string($value)) {
 					$value = js_escape($value);
-					$array_literal .= "'$value'";
+					$array_literal .= "\"$value\"";
 				} else if(is_null($value)) {
 					$array_literal .= "null";
-				} else if(is_numeric($value)) {
-					$array_literal .= $value;
 				}
+
 				$sep = ',';
 			}
 			$array_literal .= '}';
 			$row_sep = ',';
 		}
-		$array_literal .= '])';
+		$array_literal .= ']';
 		return $array_literal;
 	}
 
 	function js_escape($str) {
-		return addcslashes($str, "\\'");
+		return addcslashes($str, '\"');
 	}
 
 	function is_client_in_room($room, $client_id) {

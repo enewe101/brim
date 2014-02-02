@@ -5,13 +5,13 @@
 // Globalize some of the properties of the paper object so you
 // don't have to keep writing paper.property all the time
 paper.install(window);
-curpath = null
+curpath = null;
 
 // INITIALIZE //
 function init_whiteboard() {
 
 	// Get the canvas and bind it to paper.js
-	var canvas = $('whiteboard');
+	var canvas = $('#whiteboard').get(0);
 	paper.setup(canvas);
 
 	// Daw stuff to show connected
@@ -30,11 +30,11 @@ function init_whiteboard() {
 	toolz['pencil_tool'].activate();
 
 	// Activate the toolPallet
-	var pencil_button = $('pencil_button');
-	pencil_button.onclick = acivate_pencil;
+	var pencil_button = $('#pencil_button');
+	pencil_button.on('click', acivate_pencil);
 
-	var cloud_button = $('cloud_button');
-	cloud_button.onclick = acivate_cloud;
+	var cloud_button = $('#cloud_button');
+	cloud_button.on('click', acivate_cloud);
 
 	// Create connection to other whiteboad
 	whiteboard_channel = getWhiteboardDataChannel()
@@ -57,14 +57,14 @@ function make_pencil() {
 	// Set onmousedown
 	pencil.onMouseDown = function(event) {
 		console.log('registered mousedown');
-		currpath = new Path();
-		currpath.strokeColor = 'black';
-		currpath.add(event.point);
+		curpath = new Path();
+		curpath.strokeColor = 'black';
+		curpath.add(event.point);
 	}
 
 	pencil.onMouseDrag = function(event) {
 		console.log('registered mouseDrag().');
-		currpath.add(event.point);
+		curpath.add(event.point);
 		paper.view.draw();
 	}
 	console.log('built pencil');
@@ -78,14 +78,14 @@ function make_cloud() {
 	// Set onmousedown
 	pencil.onMouseDown = function(event) {
 		console.log('registered mousedown');
-		currpath = new Path();
-		currpath.strokeColor = 'black';
-		currpath.add(event.point);
+		curpath = new Path();
+		curpath.strokeColor = 'black';
+		curpath.add(event.point);
 	}
 
 	pencil.onMouseDrag = function(event) {
 		console.log('registered mouseDrag().');
-		currpath.arcTo(event.point);
+		curpath.arcTo(event.point);
 		paper.view.draw();
 	}
 	console.log('built pencil');
