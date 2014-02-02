@@ -77,7 +77,7 @@ function init() {
 	}
 
 	// Initialize the whiteboard
-	init_whiteboard();
+	var wb = new Whiteboard($('#whiteboard_target').get(0));
 }
 
 

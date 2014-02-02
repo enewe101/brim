@@ -8,48 +8,77 @@ paper.install(window);
 curpath = null;
 
 // INITIALIZE //
-function init_whiteboard() {
+function Whiteboard(wrapper) {
 
-	// Get the canvas and bind it to paper.js
-	var canvas = $('#whiteboard').get(0);
-	paper.setup(canvas);
+	// ensure passed element is a jQuery
+	this.wrapper = $(wrapper);
 
-	// Daw stuff to show connected
-	var path = new paper.Path();
-	path.strokeColor = 'black';
-	var start = new paper.Point(100,100);
-	path.moveTo(start);
-	path.lineTo(start.add([200, -50]));
-	paper.view.draw();
+	this.init = function() {
+		this.curpath = null;
 
-	// Build tools
-	toolz['pencil_tool'] = make_pencil();
-	toolz['cloud_tool'] = make_cloud();
+		// make the canvas
+		this.canvas = $('<canvas></canvas>');
+		this.wrapper.append(this.canvas);
+		this.canvas.css({
+			'height': '600px',
+			'width': '900px',
+			'border':'solid 1px black'
+		});
 
-	// Activate pencil by default
-	toolz['pencil_tool'].activate();
+		// Build tools
+		this.toolz = toolz;
+		this.toolz['pencil'] = make_pencil();
+		this.toolz['cloud'] = make_cloud();
 
-	// Activate the toolPallet
-	var pencil_button = $('#pencil_button');
-	pencil_button.on('click', acivate_pencil);
+		this.build_pallette();
 
-	var cloud_button = $('#cloud_button');
-	cloud_button.on('click', acivate_cloud);
+		// .get() provides the underlying native dom element
+		paper.setup(this.canvas.get(0));
 
-	// Create connection to other whiteboad
-	whiteboard_channel = getWhiteboardDataChannel()
+		// Daw stuff to show connected
+		var path = new paper.Path();
+		path.strokeColor = 'black';
+		var start = new paper.Point(100,100);
+		path.moveTo(start);
+		path.lineTo(start.add([200, -50]));
+		paper.view.draw();
+
+		// Activate pencil by default
+		this.toolz['pencil'].activate();
+
+
+		// Create connection to other whiteboad
+		whiteboard_channel = getWhiteboardDataChannel();
+	};
+
+	this.build_pallette = function() {
+
+		// make the pallette
+		this.pallette_wrapper = $('<div></div>');
+		this.wrapper.append(this.pallette_wrapper);
+		this.pallette_buttons = {
+			'pencil' : $('<div id="pencil">pencil</div>'),
+			'cloud' : $('<div id="clouds">clouds</div>')
+		};
+
+		// append the buttons and arm them
+		for(var key in this.pallette_buttons) {
+			this.pallette_wrapper.append(this.pallette_buttons[key]);
+			this.pallette_buttons[key].on(
+				'click', function() {activate(key);} );
+		}
+	};
+
+	this.init();
 }
 
 function getWhiteboardDataChannel() {
 }
 
-function  acivate_pencil() {
-	toolz['pencil_tool'].activate();
+function activate(tool_name) {
+	toolz[tool_name].activate();
 }
 
-function  acivate_cloud() {
-	toolz['cloud_tool'].activate();
-}
 
 function make_pencil() {
 	var pencil = new Tool();

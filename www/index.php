@@ -82,9 +82,11 @@
 			  <button id="aux">Aux</button>
 			</div>
 		</div>
-		<canvas id='whiteboard'></canvas>
+		<div id='whiteboard_target'>
+		<!--canvas id='whiteboard'></canvas-->
 		<a id='pencil_button'>Pencil</a>
 		<a id='cloud_button'>Clouds</a>
+		</div>
 	</div>
 	<div id='col2'>
 		<div id='chats'>
