@@ -31,19 +31,13 @@ var receive_data_handler = {
 	'onmessage': handleMessage
 };
 var send_aux_data = {
-	'onopen': handleAuxChannelOpen,
-	'onclose': handleSendChannelClose
-};
-var receive_aux_data = {
-	'onopen': function(){},
-	'onclose': function(){},
-	'onmessage': function(e){alert(e.data);}
 };
 
 /*  end GLOBALS	 */
 
 
 function init() {
+
 
 	// registration of ui elements ==> move to application layer
 	// where are these being used?
@@ -66,7 +60,7 @@ function init() {
 	//signaller = new Signaller(ids);
 
 	// Build rtc_connection and initialize
-	rtc_connection = new RTCConnectionObj(signaller);
+	rtc_connection = new RTCConnectionObj(client_id, signaller);
 	rtc_connection.init();
 
 	// Request to get the camera and microphone
@@ -77,7 +71,7 @@ function init() {
 	}
 
 	// Initialize the whiteboard
-	var wb = new Whiteboard($('#whiteboard_target').get(0));
+	window.wb = new Whiteboard($('#whiteboard_target').get(0), client_id);
 }
 
 
@@ -116,8 +110,26 @@ function add_streams_then_open(stream) {
 		'whiteboard_channel', receive_data_handler);
 
 	// add auxiliary data channel
-	rtc_connection.add_data_channel('aux_channel', send_aux_data);
-	rtc_connection.expect_data_channel('aux_channel', receive_aux_data);
+	var handler = {
+		"onopen": function () {
+			($.proxy(window.wb, "set_send_channel"))(this);
+			//$('#aux').on('click', arm_aux_button(this));
+		},
+		"onclose": function(){}
+	};
+	rtc_connection.add_data_channel('aux_channel', handler);
+
+	handler = {
+		'onopen': function(user_hash, e){
+			window.wb.add_receive_channel(user_hash, e);
+		},
+		'onclose': function(){},
+		'onmessage': function(user_hash, e) {
+			($.proxy(window.wb, "handle_message"))(user_hash, e.data);
+			//window.wb.handle_message(user_hash, e.data);
+		}
+	};
+	rtc_connection.expect_data_channel('aux_channel', handler);
 
 	// feed the local video stream back into local video viewer
 	attachMediaStream(localVideo.get(0), stream);
@@ -150,9 +162,6 @@ function handleSendChannelOpen() {
 	closeButton.on('click', closeDataChannels);
 }
 
-function handleAuxChannelOpen() {
-	$('#aux').on('click', arm_aux_button(this));
-}
 
 function handleMessage(event) {
   signaller.append_message('Received message: ' + event.data);

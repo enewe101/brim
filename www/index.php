@@ -82,6 +82,7 @@
 			  <button id="aux">Aux</button>
 			</div>
 		</div>
+		<div id="debug"></div>
 		<div id='whiteboard_target'>
 		<!--canvas id='whiteboard'></canvas-->
 		<a id='pencil_button'>Pencil</a>

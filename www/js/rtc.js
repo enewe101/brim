@@ -42,7 +42,8 @@
 // channel to broadcast a 'ping', and then all other clients would echo a 
 // 'pong', and this would allow the ready client to issue offers to all pongs.
 
-function RTCConnectionObj(signaller) {
+function RTCConnectionObj(client_id, signaller) {
+	this.client_id = client_id;
 	this.msgQueue = [];
 	this.started = initiator;
 	this.pc = null;
@@ -402,12 +403,16 @@ function RTCConnectionObj(signaller) {
 
 				// bind the callbacks passed in from the application
 				var short_name = o.channels['data']['receive'][label];
-				chan.onmessage = short_name['onmessage'];
-				chan.onopen = short_name['onopen'];
+				chan.onmessage = function(e) {
+					short_name['onmessage'](o.client_id, e);
+				};
 				chan.onclose = short_name['onclose'];
 
 				// store the data channel
 				short_name['stream'] = chan;
+
+				// call the on_open function and pass the event obj
+				short_name['onopen'](o.client_id, event);
 			}
 		};
 	}(this);
