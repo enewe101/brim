@@ -1,6 +1,5 @@
 
 // DECLARE GLOBALS	
-	toolz = {};
 
 // Globalize some of the properties of the paper object so you
 // don't have to keep writing paper.property all the time
@@ -11,9 +10,9 @@ curpath = null;
 function Whiteboard(wrapper) {
 
 	// ensure passed element is a jQuery
-	this.wrapper = $(wrapper);
 
 	this.init = function() {
+		this.wrapper = $(wrapper);
 		this.curpath = null;
 
 		// make the canvas
@@ -26,22 +25,18 @@ function Whiteboard(wrapper) {
 		});
 
 		// Build tools
-		this.toolz = toolz;
+		this.toolz = {}
 		this.toolz['pencil'] = make_pencil();
 		this.toolz['cloud'] = make_cloud();
 
 		this.build_pallette();
 
+		// Setup the canvas
 		// .get() provides the underlying native dom element
 		paper.setup(this.canvas.get(0));
 
 		// Daw stuff to show connected
-		var path = new paper.Path();
-		path.strokeColor = 'black';
-		var start = new paper.Point(100,100);
-		path.moveTo(start);
-		path.lineTo(start.add([200, -50]));
-		paper.view.draw();
+		this.test_draw();
 
 		// Activate pencil by default
 		this.toolz['pencil'].activate();
@@ -49,6 +44,15 @@ function Whiteboard(wrapper) {
 
 		// Create connection to other whiteboad
 		whiteboard_channel = getWhiteboardDataChannel();
+	};
+
+	this.test_draw = function() {
+		var path = new paper.Path();
+		path.strokeColor = 'black';
+		var start = new paper.Point(100,100);
+		path.moveTo(start);
+		path.lineTo(start.add([200, -50]));
+		paper.view.draw();
 	};
 
 	this.build_pallette = function() {
@@ -65,8 +69,12 @@ function Whiteboard(wrapper) {
 		for(var key in this.pallette_buttons) {
 			this.pallette_wrapper.append(this.pallette_buttons[key]);
 			this.pallette_buttons[key].on(
-				'click', function() {activate(key);} );
+				'click', $.proxy(this, "activate", key));
 		}
+	};
+
+	this.activate = function(tool_name) {
+		this.toolz[tool_name].activate();
 	};
 
 	this.init();
@@ -75,9 +83,6 @@ function Whiteboard(wrapper) {
 function getWhiteboardDataChannel() {
 }
 
-function activate(tool_name) {
-	toolz[tool_name].activate();
-}
 
 
 function make_pencil() {
